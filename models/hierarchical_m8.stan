@@ -58,6 +58,7 @@ transformed parameters {
   for (i in 1:T){
     delta[i] = v0[sub[i]] + b1v[sub[i]] * I[i] + b2v[sub[i]] * d2[i];
   }
+}
 
 model {
   // hyper priors

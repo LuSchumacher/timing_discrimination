@@ -63,7 +63,7 @@ init = function(chains=4) {
     L[[c]]$b2v = rep(0.0,S)
     L[[c]]$ndt = rep(0.1,S)
     L[[c]]$g   = rep(0.5,S)
-    L[[c]]$w   = 0.001
+    L[[c]]$w   = rep(0.5,S)
   }
   return (L)
 }
@@ -72,7 +72,7 @@ init = function(chains=4) {
 ## FIT MODEL
 ##------------------------------------------------
 setwd("/users/lukas/documents/github/timing_discrimination/models")
-fit_cond_C_m9 <-  stan("hierarchical_m9.stan",
+fit_cond_C_m12 <-  stan("hierarchical_m12.stan",
                          init=init(4),
                          data=stan_data,
                          chains=4,
@@ -80,5 +80,5 @@ fit_cond_C_m9 <-  stan("hierarchical_m9.stan",
                          cores=parallel::detectCores(),
                          control = list(adapt_delta=0.95))
 
-loo_fit_cond_C_m9 <- loo(fit_cond_C_m9)
-saveRDS(fit_cond_C_m9,"fit_cond_C_m9.rds")
+loo_fit_cond_C_m12 <- loo(fit_cond_C_m12)
+saveRDS(fit_cond_C_m12,"/users/lukas/documents/github/timing_discrimination/fits/fit_cond_C_m9.rds")

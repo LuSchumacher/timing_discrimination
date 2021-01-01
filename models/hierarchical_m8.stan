@@ -93,9 +93,9 @@ model {
 
   for (i in 1:T) {
     if (resp[i] == 1) {
-      rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], z0[i], delta[i]);
+      rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], z0[sub[i]], delta[i]);
     } else {
-        rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], 1-z0[i], -delta[i]);
+        rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], 1-z0[sub[i]], -delta[i]);
     }
   }
   
@@ -105,9 +105,9 @@ generated quantities {
   vector[T] log_lik;
   for (i in 1:T) {
     if(resp[i]==1) {
-      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], z0[i], delta[i]);
+      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], z0[sub[i]], delta[i]);
     } else {
-      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], 1-z0[i], -delta[i]);
+      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], 1-z0[sub[i]], -delta[i]);
     }
   }
 }

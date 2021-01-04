@@ -35,7 +35,7 @@ init = function(chains=4) {
     L[[c]]$mu_a   = 0.5
     L[[c]]$mu_ndt = -2.5
     L[[c]]$mu_z0  = rnorm(1,0,1)
-    L[[c]]$mu_bz  = rnorm(1,0,1)
+    L[[c]]$mu_bz  = 0.0
     L[[c]]$mu_v0  = rnorm(1,0,1)
     L[[c]]$mu_bv  = rnorm(1,0,1)
     L[[c]]$mu_b1v = rnorm(1,0,1)
@@ -56,7 +56,7 @@ init = function(chains=4) {
     L[[c]]$z_a   = rnorm(S,0,1)
     L[[c]]$z_ndt = rnorm(S,0,1)
     L[[c]]$z_z0  = rnorm(S,0,1)
-    L[[c]]$z_bz  = rnorm(S,0,1)
+    L[[c]]$z_bz  = rep(0.0,S)
     L[[c]]$z_v0  = rnorm(S,0,1)
     L[[c]]$z_bv  = rnorm(S,0,1)
     L[[c]]$z_b1v = rnorm(S,0,1)

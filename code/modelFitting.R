@@ -72,13 +72,17 @@ init = function(chains=4) {
 ## FIT MODEL
 ##------------------------------------------------
 setwd("/users/lukas/documents/github/timing_discrimination/models")
-fit_cond_C_m12 <-  stan("hierarchical_m12.stan",
-                         init=init(4),
+fit_cond_C_m6 <-  stan("hierarchical_m6.stan",
+                         init=init(2),
                          data=stan_data,
-                         chains=4,
-                         iter = 2000,
+                         chains=2,
+                         iter = 500,
                          cores=parallel::detectCores(),
                          control = list(adapt_delta=0.95))
 
-loo_fit_cond_C_m12 <- loo(fit_cond_C_m12)
-saveRDS(fit_cond_C_m12,"/users/lukas/documents/github/timing_discrimination/fits/fit_cond_C_m9.rds")
+loo_fit_cond_C_m6 <- loo(fit_cond_C_m6)
+# saveRDS(fit_cond_C_m4,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_cond_C_m4.rds")
+
+
+
+

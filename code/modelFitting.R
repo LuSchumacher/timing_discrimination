@@ -7,7 +7,6 @@ library(magrittr)
 setwd("/users/lukas/documents/github/timing_discrimination/data")
 df <- read_csv("exp1_cond_C.csv")
 
-
 ##------------------------------------------------
 ## FITTING PREPARATION
 ##------------------------------------------------
@@ -72,17 +71,13 @@ init = function(chains=4) {
 ## FIT MODEL
 ##------------------------------------------------
 setwd("/users/lukas/documents/github/timing_discrimination/models")
-fit_cond_C_m6 <-  stan("hierarchical_m6.stan",
-                         init=init(2),
+fit_m11 <-  stan("hierarchical_m11.stan",
+                         init=init(4),
                          data=stan_data,
-                         chains=2,
-                         iter = 500,
+                         chains=4,
+                         iter = 2000,
                          cores=parallel::detectCores(),
-                         control = list(adapt_delta=0.95))
+                         control = list(adapt_delta=0.99))
 
-loo_fit_cond_C_m6 <- loo(fit_cond_C_m6)
-# saveRDS(fit_cond_C_m4,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_cond_C_m4.rds")
-
-
-
+saveRDS(fit_m11,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_m11_new.rds")
 

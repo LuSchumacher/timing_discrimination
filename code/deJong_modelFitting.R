@@ -378,7 +378,7 @@ summary_df_2 <- df %>%
   summarise(acc=mean(resp),
             n=length(resp)) %>% 
   mutate(d1=as.factor(d1)) %>% 
-  filter(n>10)
+  filter(n>5)
 
 summary_sim_dt_kalman <- sim_dt_kalman %>% 
   group_by(c,s) %>% 
@@ -394,7 +394,7 @@ summary_sim_dt_IRM2 <- sim_dt_IRM1 %>%
   mutate(s=as.factor(s)) %>% 
   filter(n>10)
 
-summary_pred_m3 <- pred_m3_2 %>% 
+summary_pred_m3 <- pred_m3_3 %>% 
   group_by(delta_d,
            d1) %>% 
   mutate(d2_new=mean(d2)) %>% 
@@ -407,17 +407,12 @@ summary_pred_m3 <- pred_m3_2 %>%
   filter(n>10)
 
 
-# emp data only
 summary_df_2 %>%
-  ggplot()+
-  geom_point(aes(x=d2_new,
-                 y=acc,
-                 color=d1),
-             shape=3)+
-  geom_line(aes(x=d2_new,
-                y=acc,
-                color=d1),
-            linetype="dashed")+
+  ggplot(aes(x=d2_new,
+             y=acc,
+             color=d1))+
+  geom_point(shape=3)+
+  geom_line(linetype="dashed")+
   # scale_x_continuous(limits = c(0,2.4),
   #                    breaks = c(0.3,0.6,1.2,2.4))+
   # geom_point(data = summary_sim_dt_IRM2,
@@ -457,6 +452,55 @@ summary_df_2 %>%
                           group=d1),
             color="maroon")
 
+summary_df <- df %>% 
+  #mutate(resp=ifelse(resp==0,1,0)) %>% 
+  group_by(d1,
+           delta_d) %>% 
+  summarise(acc=mean(resp),
+            rt=median(rt),
+            n=length(resp)) %>% 
+  mutate(d1=as.factor(d1))
+
+  
+ggplot(data = dat, aes(ymin = 0)) +
+  scale_color_brewer(palette = "RdBu", labels = c("0.3", "0.6", "1.2", "2.4")) +
+  scale_fill_brewer(palette = "RdBu", labels = c("0.3", "0.6", "1.2", "2.4")) +
+  geom_line(data=dat_newdata, aes(x=Comparison, y=fit, colour=factor(Standard)), size = 1.5) +
+  #geom_segment(aes(x = lower, y = 0.5, xend = upper, yend = 0.5), colour = "black", data = HDIs_PSE, show.legend = FALSE, size = 2) +
+  # geom_segment(data=PSE_dt, aes(x=s, xend=PSE, y=0.5, yend=0.5, color=factor(s)), size=2) +
+  # geom_segment(data=PSE_dt, aes(x=s, xend=s, y=0.5, yend=0, color=factor(s)), size=1, linetype='dashed') +
+  # geom_segment(aes(x=geometric_mean, xend=geometric_mean, y=0.5, yend=0), size=1, linetype='dashed') +
+  # geom_density(data=CE_dt, 
+  #              aes(x=PSE, y=0.04*..density.., 
+  #                  fill=as.factor(Standard), color=as.factor(Standard)), 
+  #              alpha=0.15) +
+  # geom_point(data=PSE_dt, aes(x=s, y=0.5, color=factor(s)), size=3) +
+  # geom_point(aes(x=geometric_mean, y=0.5), size=3) +
+  guides(fill = 'none', colour = guide_legend(reverse = FALSE, title = "Standard"), size = FALSE) +
+  scale_x_continuous(name = "", breaks = c(0.3, 0.6, 1.2, 2.4), limits = c(0,2.4)) +
+  scale_y_continuous(name = "P('C Longer')", breaks = c(0, 0.25, 0.5, 0.75, 1)) +
+  #ggtitle('Empirical') +
+  theme(legend.position = 'none', 
+        legend.title = element_text(size = 16),
+        #plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+        axis.title.y = element_text(size = 14),
+        axis.title.x = element_text(size = 14))+
+  geom_point(data=summary_df_2,
+             aes(x=d2_new,
+                 y=acc,
+                 color=d1),
+             size=2)+
+  geom_line(data=summary_df_2,
+            aes(x=d2_new,
+                y=acc,
+                color=d1),
+            linetype="dashed",
+            size=1)+
+  theme_tufte()
+  
+  
+  
+  
 #------------------------------------------------------------------------------------#
 # FIT LOGISTIC REGRESSION
 #------------------------------------------------------------------------------------#
@@ -1083,8 +1127,6 @@ init = function(chains=4) {
     L[[c]]$b2v = 0.0
     L[[c]]$ndt = 0.1
     
-    L[[c]]$noise_sd = 5
-    L[[c]]$kalman_prior_var_start = 5
     L[[c]]$kalman_q = 9
     
   }
@@ -1100,8 +1142,12 @@ fit_kalman_diff <-  stan("kalman_diffusion_test.stan",
                          cores=parallel::detectCores(),
                          control = list(adapt_delta=0.95))
 
+setwd("/Users/lukas/Documents/UniHeidel/Project_Discrimination/fits")
+saveRDS(fit_kalman_diff,"fit_kalman_diff_new.rds")
+# fit_kalman_diff <- readRDS("fit_kalman_ddm.RDS")
 
-params <- c("a","ndt","z0","v0","b1v","b2v","kalman_q")
+
+params <- c("a","ndt","z0","v0","b1v","kalman_q")
 mcmc_pairs(fit_kalman_diff,params)
 
 mat <- summary(fit_kalman_diff,pars=params)$summary[,"mean"]
@@ -1127,8 +1173,7 @@ kalman_ddm_sim <- function(nTrials, mat){
   z <- mat[3]
   v0 <- mat[4]
   b1v <- mat[5]
-  b2v <- mat[6]
-  kalman_q <- mat[7]
+  kalman_q <- mat[6]
   noise_sd <- 2
   
   # variable initialization
@@ -1136,6 +1181,7 @@ kalman_ddm_sim <- function(nTrials, mat){
   xd2 <- rep(NA,nTrials)
   I_1 <- rep(NA,nTrials)
   I_2 <- rep(NA,nTrials)
+  I <- NA
   
   kalman_k <- rep(NA,nTrials)
   kalman_prior_var <- rep(NA,nTrials)
@@ -1145,13 +1191,13 @@ kalman_ddm_sim <- function(nTrials, mat){
   percept_noise_2 <- rnorm(nTrials,0,noise_sd)
   
   # iterate over trials and simulate
-  pb = txtProgressBar(min = 0, max = nTrials, initial = 0, style=3) 
   for (i in 1:nTrials) {
     
     # initial values on trial 1
     if(i==1){
       I_1[1] <-  d1[1] + percept_noise_1[1]
       I_2[1] <-  d2[1] + percept_noise_2[1]
+      I = I_1[1]
       kalman_prior_var[1] <-  5
     }else{
       # noisy stimulus perception
@@ -1161,16 +1207,18 @@ kalman_ddm_sim <- function(nTrials, mat){
       # final percept stimulus 1
       kalman_k[i] <- (kalman_prior_var[i-1] + kalman_q) / (kalman_prior_var[i-1] + kalman_q + noise_sd)
       kalman_prior_var[i] <- kalman_k[i] * noise_sd
-      I_1[i] <- (1-kalman_k[i]) * I_1[i-1] + kalman_k[i] * xd1[i]
+      I <- (1-kalman_k[i]) * I + kalman_k[i] * xd1[i]
+      I_1[i] <- I
       
       # final percept stimulus 2
       kalman_k[i] <- (kalman_prior_var[i-1] + kalman_q) / (kalman_prior_var[i-1] + kalman_q + noise_sd)
       kalman_prior_var[i] <- kalman_k[i] * noise_sd
-      I_2[i] <- (1-kalman_k[i]) * I_2[i-1] + kalman_k[i] * xd2[i]
+      I <- (1-kalman_k[i]) * I + kalman_k[i] * xd2[i]
+      I_2[i] <- I
     }
     
     # trial-by-trial drift
-    delta <- v0 + b1v * I_1[i] + b2v * I_2[i]
+    delta <- v0 + b1v * (I_1[i] - I_2[i])
     
     # diffusion process
     data <- data %>%
@@ -1192,6 +1240,10 @@ prediction$d1 <- as.factor(prediction$d1)
 df_summary <- df %>% 
   group_by(d1_centered,
            delta_d) %>% 
+  mutate(d2_new=mean(d2_centered)) %>% 
+  ungroup() %>% 
+  group_by(d1_centered,
+           d2_new) %>% 
   summarise(acc = mean(resp))
 
 df_summary$d1_centered <- as.factor(df_summary$d1_centered)
@@ -1201,25 +1253,29 @@ df_summary$d1_centered <- as.factor(df_summary$d1_centered)
 summary_prediction <- prediction %>% 
   group_by(d1,
            delta_d) %>% 
+  mutate(d2_new=mean(d2)) %>% 
+  ungroup() %>% 
+  group_by(d1,
+           d2_new) %>% 
   summarise(acc=mean(resp)) %>% 
   mutate(acc=1-acc)
 
 summary_prediction$d1 <- as.factor(summary_prediction$d1)
 
 summary_prediction %>%
-  ggplot(aes(x=delta_d,
+  ggplot(aes(x=d2_new,
              y = acc,
              color=d1))+
   geom_line(size=0.8)+
   geom_point(size=1)+
   geom_point(data=df_summary,
-             mapping=aes(x=delta_d,
+             mapping=aes(x=d2_new,
                          y=acc,
                          color=d1_centered),
              shape=3,
              size=4)+
   geom_line(data=df_summary,
-            mapping=aes(x=delta_d,
+            mapping=aes(x=d2_new,
                         y=acc,
                         color=d1_centered),
             linetype="dashed")+
@@ -1272,7 +1328,7 @@ pp_sim_m3_2 <- function(nTrials, mat){
   source("wienerProcess2.R")
   library(svMisc)
   
-  data <- data.frame(matrix(ncol=9,nrow=0, dimnames=list(NULL, c("resp","rt","d1","d2","d1_nC","d2_nC","delta_d","X_1","X_2"))))
+  data <- data.frame(matrix(ncol=7,nrow=0, dimnames=list(NULL, c("resp","rt","d1","d2","delta_d","X_1","X_2"))))
   
   a <- mat[1]
   ndt <- mat[2]
@@ -1308,7 +1364,7 @@ pp_sim_m3_2 <- function(nTrials, mat){
     
     
     data <- data %>% add_row(wienerProcess2(v=delta[i], a=a, z=beta[i], ndt=ndt),
-                             d1=d1[i],d2=d2[i],d1_nC=d1_nC[i],d2_nC=d2_nC[i],delta_d=delta_d[i],X_1=X_1[i],X_2=X_2[i])
+                             d1=d1[i],d2=d2[i],delta_d=delta_d[i],X_1=X_1[i],X_2=X_2[i])
   }
   end_time <- Sys.time()
   print(end_time - start_time)
@@ -1320,8 +1376,8 @@ pp_sim_m3_2 <- function(nTrials, mat){
 pred_m3_3 <- pp_sim_m3_2(nTrials, mat)
 
 pred_m3_3$d1 <- as.factor(pred_m3_3$d1)
-pred_logReg <- brm(resp~d2_nC*d1,
-                   data=pred_m3_2,
+pred_logReg <- brm(resp~d2*d1,
+                   data=pred_m3_3,
                    family = bernoulli(),
                    chains = 2,
                    iter = 500,
@@ -1395,7 +1451,7 @@ summary_pred_m3_3 %>%
   facet_wrap(~d1)
 
 # plot different d1 in individual color
-summary_pred_m3_2 %>% 
+summary_pred_m3_3 %>% 
   ggplot(aes(x=delta_d,
              y=acc,
              color=d1))+
@@ -1516,10 +1572,122 @@ m3_3 <-  stan("m3_deJong_3.stan",
             iter = 500,
             cores=parallel::detectCores())
 
+# setwd("/Users/lukas/Documents/UniHeidel/Project_Discrimination/fits")
+# saveRDS(m3_3,"fit_dejong_m3_3.rds")
 setwd("/Users/lukas/Documents/UniHeidel/Project_Discrimination/fits")
-saveRDS(m3_3,"fit_dejong_m3_3.rds")
-
+m3_3 <- readRDS("fit_dejong_m3_3.rds")
 
 pars <- c("mu_a","mu_ndt","mu_z0","mu_bz","mu_v0","mu_b1v","mu_g")
 mcmc_pairs(m3_3, pars=pars)
 
+
+# summarize predicted data with d2 averaged over delta_d
+summary_pred_m3 <- pred_m3_3 %>% 
+  group_by(delta_d,
+           d1) %>% 
+  mutate(d2_new=mean(d2)) %>% 
+  ungroup() %>% 
+  group_by(d1,
+           d2_new) %>% 
+  summarise(acc=mean(resp),
+            n=length(resp)) %>% 
+  mutate(d1=as.factor(d1)) %>% 
+  filter(n>10)
+
+# summarize emp data with d2 averaged over delta_d
+summary_df_2 <- df %>% 
+  group_by(delta_d,
+           d1) %>% 
+  mutate(d2_new=mean(d2)) %>% 
+  ungroup() %>% 
+  group_by(d1,
+           d2_new) %>% 
+  summarise(acc=mean(resp),
+            n=length(resp)) %>% 
+  mutate(d1=as.factor(d1)) %>% 
+  filter(n>5)
+
+
+# plot emp and pred data
+summary_df_2 %>%
+  ggplot(aes(x=d2_new,
+             y=acc,
+             color=d1))+
+  geom_point(shape=3)+
+  geom_line(linetype="dashed")+
+geom_line(data = summary_pred_m3,
+          mapping = aes(x=d2_new,
+                        y=acc,
+                        group=d1),
+          color="maroon")
+
+# emp log fit
+df <- df %>%
+  group_by(delta_d,
+           d1) %>% 
+  mutate(d2_new=mean(d2),
+         d1=as.factor(d1))
+  
+log_emp <- brm(resp~d1*d2_new,
+               data = df,
+               family = bernoulli(),
+               chains = 4,
+               iter = 1000,
+               cores = parallel::detectCores())
+
+conditional_effects(log_emp)
+
+# emp log fit
+pred_m3_3 <- pred_m3_3 %>%
+  group_by(delta_d,
+           d1) %>% 
+  mutate(d2_new=mean(d2),
+         d1=as.factor(d1))
+
+log_pred <- brm(resp~d1*d2_new,
+               data = pred_m3_3,
+               family = bernoulli(),
+               chains = 4,
+               iter = 1000,
+               cores = parallel::detectCores())
+
+conditional_effects(log_pred)
+
+
+summary_pred_m3 <- pred_m3_3 %>% 
+  group_by(delta_d,
+           d1) %>% 
+  summarise(acc=mean(resp),
+            n=length(resp)) %>% 
+  mutate(d1=as.factor(d1)) %>% 
+  filter(n>10)
+
+# summarize emp data with d2 averaged over delta_d
+summary_df_2 <- df %>% 
+  group_by(delta_d,
+           d1) %>% 
+  summarise(acc=mean(resp),
+            n=length(resp)) %>% 
+  mutate(d1=as.factor(d1)) %>% 
+  filter(n>5)
+
+
+# plot emp and pred data
+summary_df_2 %>%
+  ggplot(aes(x=delta_d,
+             y=acc,
+             color=d1))+
+  geom_point(shape=3)+
+  geom_line(linetype="dashed")+
+  geom_line(data = summary_pred_m3,
+            mapping = aes(x=delta_d,
+                          y=acc,
+                          group=d1,
+                          color=d1))
+
+# emp log fit
+df <- df %>%
+  group_by(delta_d,
+           d1) %>% 
+  mutate(d2_new=mean(d2),
+         d1=as.factor(d1))

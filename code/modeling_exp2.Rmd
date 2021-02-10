@@ -1,0 +1,434 @@
+---
+title: "Untitled"
+author: "Lukas Schumacher"
+date: "2/10/2021"
+output: html_document
+---
+
+Diffusion modeling of the visual duration discrimination task (exp 2) of dyjas et al. (2012)
+
+### Load final data
+```{r}
+library(tidyverse)
+library(brms)
+library(rstan)
+library(bayesplot)
+library(magrittr)
+library(lemon)
+library(viridis)
+library(tidybayes)
+library(BayesianFROC)
+library(ggthemes)
+library(latex2exp)
+
+# load final data // skip data preparation section
+setwd("/users/lukas/documents/github/timing_discrimination/data/")
+df <- read.csv("exp2_cond_C.csv")
+
+color_palette <- c("#2E5868","#B06988")
+```
+
+### Data preperation
+```{r}
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/Dyjas Bausenhart Ulrich 2012/Experiment 2")
+
+# Read all files into one data frame
+files = list.files(pattern="*D.txt")
+df = NULL
+for (f in files) {
+  sub=as.numeric(substr(f,10,nchar(f)-5))
+  # if(sub==99) next
+  data = read.table(f, skip=30)
+  colnames(data) = c("trl", "cpos", "cdur", "resp", "RT", "type")
+  data$d1 = ifelse(data$cpos==2, 500, data$cdur)
+  data$d2 = ifelse(data$cpos==2, data$cdur, 500)
+  
+  df=rbind(
+    df,
+    cbind(
+      sub=sub,
+      data)
+  )
+}
+
+# arrange by sub
+df %<>%
+  mutate(sub=as.numeric(sub)) %>% 
+  arrange(sub)
+
+# Remove NA response
+df[df$resp<1 | df$resp>2,"resp"] = NA
+df = na.omit(df)
+```
+
+#### EWMA
+```{r}
+# calculate correct response
+df$correct <- NA
+for (i in 1:nrow(df)) {
+  if(df$cpos[i]==1 & df$cdur[i]>500){
+    if(df$resp[i]==1){
+      df$correct[i] <- 1
+    }else{
+      df$correct[i] <- 0
+    }
+  }else if(df$cpos[i]==1 & df$cdur[i]<500){
+    if(df$resp[i]==2){
+      df$correct[i] <- 1
+    }else{
+      df$correct[i] <- 0
+    }
+  }else if(df$cpos[i]==2 & df$cdur[i]>500){
+    if(df$resp[i]==2){
+      df$correct[i] <- 1
+    }else{
+      df$correct[i] <- 0
+    }
+  }else if(df$cdur[i]==500){
+    df$correct[i] <- 0
+  }
+  else{
+    if(df$resp[i]==1){
+      df$correct[i] <- 1
+    }else{
+      df$correct[i] <- 0
+    }
+  }
+}
+
+# Define constants
+lambda   <- 0.01  # weight param (how many previous data points)
+c_0      <- 0.5   # in-control mean (expected average performance for fast guess)
+sigma_0  <- 0.5   # in-control sd
+L        <- 1.5   # sensitivity (1.5 is a relative low value)
+
+# Compute EMWA
+data <- data.frame()
+for (s in unique(df$sub)) {
+  
+  tmp <- df %>% 
+    filter(sub==s) %>% 
+    arrange(RT)
+  
+  tmp$c_s <- NA
+  tmp$inCm <- "empty"
+  tmp$UCL <- NA
+  
+  c_before <- c_0
+  
+  # Compute EWMA for each data point
+  for (i in 1:length(tmp$RT)) {
+    if(tmp$cdur[i]==500) next
+    tmp$c_s[i] <- (lambda*tmp$correct[i]) + ((1-lambda)*c_before)
+    tmp$UCL[i] <- c_0 + (L*sigma_0)*sqrt((lambda/(2-lambda))*(1-(1-lambda)^(2*i)))
+    tmp$inCm[i] <- tmp$c_s[i] < tmp$UCL[i]
+    c_before <- tmp$c_s[i]
+  }
+  
+  data <- rbind(data,tmp)
+}
+
+# plot EWMA control chart
+data %>%
+  filter(inCm != "empty") %>% 
+  mutate(inCm=as.logical(inCm)) %>% 
+  ggplot(aes(x=RT,
+             y=c_s,
+             color=(inCm>0)))+
+  geom_line(aes(group=2),
+            size=0.3)+
+  geom_hline(yintercept = 0.5,
+             linetype="dotted")+
+  geom_line(aes(x=RT,
+                y=UCL,
+                color="black"))+
+  scale_color_manual(values=c("#453b44","#39C8C6","#630C3A"))+
+  xlab("\nReaction time (s)")+
+  ylab(TeX("State of the system ($c_s$)"))+
+  ggtitle("EWMA control chart")+
+  theme_tufte(base_family = "GillSans")+
+  theme(legend.position="none",
+        axis.line = element_line(size = .5, color = "#444444"),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        text=element_text(size = 16),
+        plot.title = element_text(size =18,
+                                  hjust = 0.5),
+        axis.title.y = element_text(vjust = 0.5,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))+
+  scale_x_continuous(limits = c(0,2000))+
+  facet_wrap(~sub)
+```
+
+#### Fast guesses
+```{r}
+# check proportion of fast guesses for each sub
+data %>%
+  filter(inCm==TRUE,
+         cdur!=500,
+         RT<100) %>% 
+  group_by(sub) %>% 
+  summarise(acc=round(mean(correct),2),
+            rt=round(mean(RT),3),
+            n=length(correct),
+            prob=round(n/660,2))
+
+# check proportion of very slow responses for each sub
+data %>%
+  filter(cdur!=500,
+         RT>2000) %>% 
+  group_by(sub) %>% 
+  summarise(acc=round(mean(correct),2),
+            rt=round(mean(RT),3),
+            n=length(correct),
+            prob=round(n/660,2))
+
+# overall accuracy
+data %>%
+  filter(cdur!=500) %>% 
+  group_by(sub) %>% 
+  summarise(acc=round(mean(correct),2),
+            rt=round(mean(RT),3),
+            n=length(correct))
+
+# cut 7, 10, 19
+# remove non-cooperative participants and fast guesses and slow responses
+df <- data %>% 
+  filter(sub!=7,
+         sub!=10,
+         sub!=19) %>% 
+  mutate(inCm=as.character(inCm)) %>% 
+  filter(inCm!="TRUE",
+         RT>100,
+         RT<2000)
+
+# rearrange
+df %<>% arrange(sub,trl)
+
+# reassign sub nr
+df %<>%
+  mutate(sub=as.numeric(sub)) %>% 
+  arrange(sub)
+nr <- 1
+for (i in 2:length(df$sub)){
+  if(df$sub[i]!=df$sub[i-1]){
+    nr <- nr+1
+    df$sub[df$sub==df$sub[i]] <- nr
+  }
+}
+# save final data
+write_csv(df,"/users/lukas/documents/github/timing_discrimination/data/exp2_cond_C.csv")
+
+```
+
+
+#### DL and PSE
+```{r}
+# function for transform probability to logit
+prob2logit <- function(prob){
+  logit <- log(prob/(1-prob))
+  return(logit)
+}
+
+df$DL_1 <- NA
+df$DL_2 <- NA
+df$PSE_1 <- NA
+df$PSE_2 <- NA
+
+for (s in unique(df$sub)) {
+  tmp <- df %>% 
+  filter(sub==s) %>% 
+  mutate(resp=2-resp,
+         cpos=as.factor(cpos),
+         cdur=(cdur-500))
+  
+  tmp$resp[tmp$cpos==2] <- 1 - tmp$resp[tmp$cpos==2]
+  
+  # logstic regression for psychometric curve
+  logReg <- tmp %>%
+    brm(formula = resp~cdur*cpos,
+        family = bernoulli(),
+        chains = 4,
+        iter = 1000,
+        cores=parallel::detectCores(),
+        control = list(adapt_delta=0.95))
+
+  params <- as.numeric(as.data.frame(logReg) %>% colMeans())
+
+  # DL and PSE for cpos = 1
+  c25_1 <- (prob2logit(0.25)-params[1])/params[2]
+  df$PSE_1[df$sub==s] <- (prob2logit(0.50)-params[1])/params[2]
+  c75_1 <- (prob2logit(0.75)-params[1])/params[2]
+  df$DL_1[df$sub==s] <- (c75_1 - c25_1)/2
+  # DL and PSE for cpos = 2
+  c25_2 <- (prob2logit(0.25)-params[1]-params[3])/(params[2]+params[4])
+  df$PSE_2[df$sub==s] <- (prob2logit(0.50)-params[1]-params[3])/(params[2]+params[4])
+  c75_2 <- (prob2logit(0.75)-params[1]-params[3])/(params[2]+params[4])
+  df$DL_2[df$sub==s] <- (c75_2 - c25_2)/2
+}
+
+summary_emp_DL_PSE <- df %>% 
+  group_by(sub) %>% 
+  summarise(DL_1=DL_1[1],
+            DL_2=DL_2[1],
+            PSE_1=PSE_1[1],
+            PSE_2=PSE_2[1]) %>% 
+  mutate(DL_diff=DL_2-DL_1,
+         PSE_dff=abs(PSE_2)-abs(PSE_1))
+
+df %<>%
+    mutate(DL_diff=DL_2-DL_1,
+         PSE_diff=abs(PSE_2)-abs(PSE_1))
+
+```
+
+
+
+### Psychometrics
+```{r}
+summary <- df %>%
+  group_by(sub,
+           cdur,
+           cpos) %>% 
+  mutate(resp=2-resp) %>% 
+  summarise(prob_c = mean(resp))
+
+summary$prob_c[summary$cpos==2] <- 1 - summary$prob_c[summary$cpos==2]
+summary$cpos <- as.factor(summary$cpos)
+
+color_palette <- c("#2E5868","#B06988")
+summary %>% ggplot(aes(x=cdur,
+                       y=prob_c,
+                       color=cpos))+
+  geom_line(size=0.8)+
+  geom_point(size=1)+
+  geom_hline(yintercept=0.5,
+             linetype="dashed")+
+  facet_wrap(~sub)+
+  scale_x_continuous(breaks=unique(summary$cdur),
+                     labels=unique(summary$cdur),
+                     expand = c(0.01,0.01))+
+  ggthemes::theme_tufte()+
+  scale_color_manual(values = color_palette)+
+  scale_fill_manual(values = color_palette,
+                    guide=F)+
+  scale_linetype_manual(values=c("solid","dashed"))+
+  ylab("Probability for c > s response")+
+  xlab("\nDuration of c")+
+  labs(color = "Position of c")+
+  theme(axis.line = element_line(size = .5, color = "#969696"),
+        axis.ticks = element_line(color = "#969696"),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        text=element_text(size = 16),
+        plot.title = element_text(size =18,
+                                  hjust = 0.5),
+        axis.title.y = element_text(vjust = 0.5,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))
+
+```
+### RT distributions
+```{r}
+df %>% 
+  ggplot(aes(x=RT)) + 
+  geom_density() +
+  facet_wrap(~sub)+
+  ggthemes::theme_tufte()+
+  scale_color_manual(values = color_palette)+
+  scale_fill_manual(values = color_palette,
+                    guide=F)+
+  scale_linetype_manual(values=c("solid","dashed"))+
+  ylab("Probability for c > s response")+
+  xlab("\nDuration of c")+
+  labs(color = "Position of c")+
+  theme(axis.line = element_line(size = .5, color = "#969696"),
+        axis.ticks = element_line(color = "#969696"),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        text=element_text(size = 16),
+        plot.title = element_text(size =18,
+                                  hjust = 0.5),
+        axis.title.y = element_text(vjust = 0.5,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))
+
+```
+
+### Fitting preparation
+```{r}
+# set working directory to the location of the stan models
+setwd("/users/lukas/documents/github/timing_discrimination/models")
+
+# get number of participants
+S = length(unique(df$sub))
+
+# arrange rows of df after sub and then trial
+df <- df %>% 
+  arrange(sub,trl)
+
+# create stan data
+stan_data = list(
+  `T`  = nrow(df),
+  S    = S,
+  sub  = df$sub,
+  d1   = df$d1-500,
+  d2   = df$d2-500,
+  resp = df$resp,
+  rt   = df$RT / 1000
+)
+
+# set initial values
+init = function(chains=4) {
+  L = list()
+  for (c in 1:chains) {
+    L[[c]]=list()
+    
+    L[[c]]$mu_a   = 1.0
+    L[[c]]$mu_ndt = 0.1
+    L[[c]]$mu_z0  = 0.5
+    L[[c]]$mu_bz  = 0.0
+    L[[c]]$mu_v0  = 1.0
+    L[[c]]$mu_bv  = 0.0
+    L[[c]]$mu_b1v = 0.0
+    L[[c]]$mu_b2v = 0.0
+    L[[c]]$mu_g   = 0.5
+    
+    L[[c]]$sd_a   = 0.001
+    L[[c]]$sd_ndt = 0.001
+    L[[c]]$sd_z0  = 0.001
+    L[[c]]$sd_bz  = 0.001
+    L[[c]]$sd_v0  = 0.001
+    L[[c]]$sd_bv  = 0.001
+    L[[c]]$sd_b1v = 0.001
+    L[[c]]$sd_b2v = 0.001
+    L[[c]]$sd_g   = 0.001
+    
+    L[[c]]$a = rep(1,S)
+    L[[c]]$z0 = rep(0.5,S)
+    L[[c]]$bz = rep(0.0,S)
+    L[[c]]$v0 = rep(1.0,S)
+    L[[c]]$bv = rep(0.0,S)
+    L[[c]]$b1v = rep(0.0,S)
+    L[[c]]$b2v = rep(0.0,S)
+    L[[c]]$ndt = rep(0.1,S)
+    L[[c]]$g = rep(0.5,S)
+  }
+  return (L)
+}
+
+```
+
+### Model 9
+```{r}
+fit_m9 <-  stan("hierarchical_m9.stan",
+                         init=init(4),
+                         data=stan_data,
+                         chains=4,
+                         iter = 2000,
+                         cores=parallel::detectCores(),
+                         control = list(adapt_delta=0.99,
+                                        max_treedepth=15))
+
+# saveRDS(fit_m11,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_m11_new.rds")
+```
+
+

@@ -2,7 +2,7 @@ data {
   int<lower=1>                   T;         // number of trials 
   int<lower=1>                   S;         // number of subjects
   int<lower=1>                   sub[T];    // subject number
-  int<lower=1, upper=2>          resp[T];   // response
+  int                            resp[T];   // response
   vector<lower=0>[T]             rt;        // response time
   vector[T]                      d1;        // stimulus 1
   vector[T]                      d2;        // stimulus 2

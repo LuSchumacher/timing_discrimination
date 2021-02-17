@@ -48,12 +48,12 @@ transformed parameters {
   // individual parameter   
   real<lower=0>             a[S];     // individual threshold
   real<lower=0>             ndt[S];   // individual non-decision time
-  real                      z0[S];    // individual starting point intercept
+  real<lower=0, upper=1>    z0[S];    // individual starting point intercept
   real                      bz[S];    // individual starting point intercept
   real                      v0[S];    // individual drift intercept
   real                      b1v[S];   // individual drift beta 1
   real                      b2v[S];   // individual drift beta 2
-  real                      g[S];     // IRM updating param
+  real<lower=0, upper=1>    g[S];     // IRM updating param
 
   // non-centered parametrization
   for (s in 1:S){

@@ -6,6 +6,7 @@ data {
   vector[T]                 rt;        // response time
   vector[T]                 d1;        // stimulus 1
   vector[T]                 d2;        // stimulus 2
+  
 }
 
 parameters {

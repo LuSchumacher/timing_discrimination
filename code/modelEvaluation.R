@@ -85,7 +85,8 @@ loo_compare(loo_m7,
 
 shinystan::launch_shinystan(m9)
 
-pars <- c("mu_a","mu_ndt","mu_z0","mu_bz","mu_v0","mu_b1v","mu_b2v")
+pars <- c("mu_a","mu_ndt","mu_z0","mu_bz","mu_v0","mu_b1v","mu_b2v", "mu_g",
+          "sigma_a","sigma_ndt","sigma_z0","sigma_bz","sigma_v0","sigma_b1v","sigma_b2v", "sigma_g")
 mcmc_pairs(fit_m10,
            pars=pars)
 

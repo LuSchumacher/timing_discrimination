@@ -41,27 +41,27 @@ init = function(chains=4) {
     L[[c]]$mu_b2v   = rnorm(1,0,0.5)
     L[[c]]$mu_g     = rnorm(1,0,0.5)
     
-    L[[c]]$sd_a     = 0.001
-    L[[c]]$sd_ndt   = 0.001
-    L[[c]]$sd_z0    = 0.001
-    L[[c]]$sd_bz    = 0.001
-    L[[c]]$sd_v0    = 0.001
-    L[[c]]$sd_b1v   = 0.001
-    L[[c]]$sd_b2v   = 0.001
-    L[[c]]$sd_g     = 0.001
+    L[[c]]$sigma_a     = 0.001
+    L[[c]]$sigma_ndt   = 0.001
+    L[[c]]$sigma_z0    = 0.001
+    L[[c]]$sigma_bz    = 0.001
+    L[[c]]$sigma_v0    = 0.001
+    L[[c]]$sigma_b1v   = 0.001
+    L[[c]]$sigma_b2v   = 0.001
+    L[[c]]$sigma_g     = 0.001
     
     S = length(unique(df$sub))
     L[[c]]$z_a     = rnorm(S,0,0.5)
-    L[[c]]$z_ndt   = rep(0.0,S)
+    L[[c]]$z_ndt   = rnorm(S,0,0.5)
     L[[c]]$z_z0    = rnorm(S,0,0.1)
-    L[[c]]$z_bz    = rep(0.0,S)
+    L[[c]]$z_bz    = rnorm(S,0,0.5)
     L[[c]]$z_v0    = rnorm(S,0,0.5)
     L[[c]]$z_b1v   = rnorm(S,0,0.5)
     L[[c]]$z_b2v   = rnorm(S,0,0.5)
     L[[c]]$z_g     = rnorm(S,0,0.5)
     
-    L[[c]]$z0      = rep(0.5,S)
-    L[[c]]$bz      = rep(0.0,S)
+    # L[[c]]$z0      = rep(0.5,S)
+    # L[[c]]$bz      = rep(0.0,S)
     
   }
   return (L)
@@ -74,5 +74,5 @@ m9 <-  stan("m9.stan",
             chains=4,
             iter = 500,
             cores=parallel::detectCores(),
-            control = list(adapt_delta=0.95))
+            control = list(adapt_delta=0.9))
 

@@ -6,7 +6,6 @@ data {
   vector[T]                 rt;        // response time
   vector[T]                 d1;        // stimulus 1
   vector[T]                 d2;        // stimulus 2
-  
 }
 
 parameters {
@@ -96,7 +95,7 @@ model {
   mu_z0      ~ normal(0,1);
   sigma_z0   ~ normal(0,1);
   mu_bz      ~ normal(0,3);
-  sigma_bz   ~ normal(0,2);
+  sigma_bz   ~ normal(0,3);
 
   mu_v0      ~ normal(0,3);
   sigma_v0   ~ normal(0,2);

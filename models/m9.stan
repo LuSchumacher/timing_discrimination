@@ -114,6 +114,7 @@ model {
   z_v0       ~ normal(0,1);
   z_b1v      ~ normal(0,1);
   z_b2v      ~ normal(0,1);
+  z_g        ~ normal(0,1);
 
   for (i in 1:T) {
     if (resp[i] == 1) {
@@ -134,4 +135,3 @@ generated quantities {
     }
   }
 }
-

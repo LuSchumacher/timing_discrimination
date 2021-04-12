@@ -9,6 +9,9 @@ library(bayesplot)
 library(lemon)
 library(viridis)
 library(bridgesampling)
+library(HDInterval)
+library(cowplot)
+library(bayestestR)
 color_palette <- c("#2E5868","#B06988")
 
 # read empirical data
@@ -29,66 +32,95 @@ df_summary$Acc[df_summary$cpos==1] <- 1 - df_summary$Acc[df_summary$cpos==1]
 df_summary$cpos <- as.factor(df_summary$cpos)
 
 
-# read model fits
+# model comparison
 setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# Difference model
 m1 <- readRDS("fit_m1_new.rds")
-m2 <- readRDS("fit_m2_new.rds")
-m3 <- readRDS("fit_m3_new.rds")
-m4 <- readRDS("fit_m4_new.rds")
-m5 <- readRDS("fit_m5_new.rds")
-m6 <- readRDS("fit_m6_new.rds")
-m7 <- readRDS("fit_m7_new.rds")
-m9 <- readRDS("fit_m9_new.rds")
-m10 <- readRDS("fit_m10_new.rds")
-m11 <- readRDS("fit_m11_new.rds")
-m12 <- readRDS("fit_m12_new.rds")
-
-
-check_divergences(m1)
-check_divergences(m2)
-check_divergences(m3)
-check_divergences(m5)
-check_divergences(m6)
-check_divergences(m7)
-check_divergences(m9)
-check_divergences(m10)
-check_divergences(m11)
-check_divergences(m12)
-
-# compute loo
 loo_m1 <- loo(m1)
+# IRM
+m2 <- readRDS("fit_m2_new.rds")
 loo_m2 <- loo(m2)
+
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# SWM
+m3 <- readRDS("fit_m6_new.rds")
 loo_m3 <- loo(m3)
+# IRM 2x IR
+m4 <- readRDS("fit_m4_exp1.rds")
 loo_m4 <- loo(m4)
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# IRM + SWM
+m5 <- readRDS("fit_m5_new.rds")
 loo_m5 <- loo(m5)
+# IRM + bias
+m6 <- readRDS("fit_m4_new.rds")
 loo_m6 <- loo(m6)
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# SWM + bias
+m7 <- readRDS("fit_m7_new.rds")
 loo_m7 <- loo(m7)
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# IRM 2xIR
+m8 <- readRDS("fit_m9_exp1_actual.rds")
+loo_m8 <- loo(m8)
+# IRM + SWM + bias
+m9 <- readRDS("fit_m9_new.rds")
 loo_m9 <- loo(m9)
-loo_m10 <- loo(m10)
-loo_m11 <- loo(m11)
-loo_m12 <- loo(m12)
+
 
 # compare goodness-of-fit
 comparison <- loo_compare(loo_m1,
                           loo_m2,
-                          loo_m6,
                           loo_m3,
                           loo_m4,
                           loo_m5,
+                          loo_m6,
                           loo_m7,
-                          loo_m9)
+                          loo_m8)
 
-# write.csv(comparison,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/loo_comparison")
 
-loo_compare(loo_m7,
-            loo_m6)
+## plot model comparison
+#------------------------------------------------------------------------#
+# df with cols: model, elpd_diff, SE
+comparison %<>% 
+  as_tibble(rownames = "model") %>% 
+  mutate(model=str_replace_all(model,"(.{5})", "\\1 "),
+         Experiment=1)
 
-shinystan::launch_shinystan(m9)
+write.csv(comparison,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/loo_comparison_exp1.csv")
 
-pars <- c("mu_a","mu_ndt","mu_z0","mu_bz","mu_v0","mu_b1v","mu_b2v", "mu_g",
-          "sigma_a","sigma_ndt","sigma_z0","sigma_bz","sigma_v0","sigma_b1v","sigma_b2v", "sigma_g")
-mcmc_pairs(fit_m10,
-           pars=pars)
+# read comparison
+comparison <- read_csv("/users/lukas/documents/UniHeidel/Project_Discrimination/fits/loo_comparison.csv")
+
+comparison %>% 
+  ggplot(aes(x = elpd_diff,
+         y = model))+
+  geom_point(color=carto_pal(7, "BurgYl")[7],
+             size=3)+
+  geom_linerange(aes(xmin=elpd_diff-se_diff*5,
+                      xmax=elpd_diff+se_diff*5),
+                 color="#B06988",
+                 size=1)+
+  geom_linerange(aes(xmin=elpd_diff-se_diff,
+                      xmax=elpd_diff+se_diff),
+                  color=carto_pal(7, "BurgYl")[7],
+                  size=2)+
+  geom_vline(xintercept = 0,
+             linetype="dashed",
+             color="#969696")+
+  ggthemes::theme_tufte()+
+  ylab("Model")+
+  xlab("\nDifference in Elpd")+
+  theme(axis.line = element_line(size = .5, color = "#969696"),
+        axis.ticks = element_line(color = "#969696"),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        text=element_text(size = 16),
+        plot.title = element_text(size =18,
+                                  hjust = 0.5),
+        axis.title.y = element_text(vjust = 0.5,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))
+
 
 #------------------------------------------------------------------------#
 # POSTERIOR PREDICTIVE CHECK: BRIDGE SAMPLING
@@ -133,11 +165,6 @@ m6_bridge <- bridgesampling::bridge_sampler(m6, new_mod,
 post_prob <- post_prob(m2_bridge,m6_bridge)
 bf <- bf(m6_bridge,m2_bridge)
 
-#------------------------------------------------------------------------#
-# POSTERIOR PREDICTIVE CHECK: PARAMETERS PLOT
-#------------------------------------------------------------------------#
-stan_dens(m7,pars,
-          alpha=0.7)
 
 #------------------------------------------------------------------------#
 # POSTERIOR PREDICTIVE CHECK: ACCURACY
@@ -204,6 +231,8 @@ discrimination_ddm_sim <- function(nTrials, mat){
 # setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 # write.csv(pred_m7,"pred_m7.csv")
 
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+pred_m7 <- read_csv("pred_m7.csv")
 
 # summarize within dataset
 summary_pred_m7 <- pred_m7 %>% 
@@ -222,10 +251,15 @@ summary_pred_m7 <- summary_pred_m7 %>%
            cdur) %>%
   summarise(acc_quantile_low=quantile(acc,probs=0.025),
             acc_quantile_high=quantile(acc,probs=0.975),
+            acc_hdi_low=HDInterval::hdi(acc,credMass = 0.89)['lower'],
+            acc_hdi_high=HDInterval::hdi(acc,credMass = 0.89)['upper'],
             acc=mean(acc),
             rt_quantile_low=quantile(rt,probs=0.025),
             rt_quantile_high=quantile(rt,probs=0.975),
+            rt_hdi_low=HDInterval::hdi(rt,credMass = 0.89)['lower'],
+            rt_hdi_high=HDInterval::hdi(rt,credMass = 0.89)['upper'],
             rt=median(rt))
+
 
 summary_pred_m7$cpos <- as.factor(summary_pred_m7$cpos)
 
@@ -234,8 +268,8 @@ tiff('/users/lukas/desktop/pp_check_acc.tiff', units="in", width=8, height=5, re
 summary_pred_m7 %>% ggplot(aes(x=cdur,
                                    y = acc,
                                    color=cpos))+
-  geom_ribbon(aes(ymin = acc_quantile_low,
-                  ymax = acc_quantile_high,
+  geom_ribbon(aes(ymin = acc_hdi_low,
+                  ymax = acc_hdi_high,
                   fill=cpos),
               alpha=0.2,
               color=NA)+
@@ -260,7 +294,7 @@ summary_pred_m7 %>% ggplot(aes(x=cdur,
                     guide=F)+
   scale_linetype_manual(values=c("solid","dashed"))+
   ylab("Probability for c > s response")+
-  xlab("\nDuration of c")+
+  xlab("\nDuration of c (ms)")+
   labs(color = "Position of c")+
   theme(axis.line = element_line(size = .5, color = "#969696"),
         axis.ticks = element_line(color = "#969696"),
@@ -338,24 +372,30 @@ b2v <- mat %>%
 mat <- cbind(a,ndt,z0,bz,v0,b1v,b2v)
 
 # sample posteriors
-posterior_samples <- sample(max(mat$sample),50)
-mat <- mat %>% 
+n_samples <- 100
+posterior_samples <- sample(max(mat$sample),n_samples)
+posteriors <- mat %>% 
   filter(sample %in% posterior_samples)
 
 
 sub_sim <- function(mat){
   
   setwd("/Users/lukas/documents/UniHeidel/code")
-  source("wienerProcess.R")
+  source("wienerProcess2.R")
   library(svMisc)
   
-  data <- data.frame(matrix(ncol=8,nrow=0,
-                            dimnames=list(NULL, c("dataset","sub","d1","d2","cdur","cpos","resp", "rt"))))
+  col_names <- c("dataset","sub","d1","d2","cdur","cpos","resp", "rt")
+  data <- matrix(ncol=8,
+                 nrow=nrow(df)*n_samples,
+                 dimnames=list(NULL, col_names))
+  df_nrow <- nrow(df)
   
+  x <- 1
   # iterate over posterior samples
   for (t in unique(mat$sample)){
     
     start_time <- Sys.time()
+    cum_nrow <- 0
     # iterate over subjects
     for (s in 1:length(unique(mat$sub))){
       a   <- mat$a[mat$sample==t][s]
@@ -374,32 +414,35 @@ sub_sim <- function(mat){
       d2 = tmp_df$d2-500
       cdur <- tmp_df$cdur
       cpos <- as.numeric(tmp_df$cpos)
-      
+
       # beta <- z + bz * d1
       # delta <- v0 + b1v * d1 + b2v * d2
       
       for (i in 1:nTrials) {
         
-        delta <-  v0 + b1v * d1[i] + b2v* d2[i]
+        delta <-  v0 + b1v * d1[i] + b2v * d2[i]
         beta <- z + bz * d1[i]
         
-        data <- data %>%
-          add_row(dataset=t, sub=s,
-                  d1=d1[i],d2=d2[i],cdur=cdur[i],cpos=cpos[i],
-                  wienerProcess(v=delta, a=a, z=beta, ndt=ndt))
+        diff_process <- wienerProcess2(v=delta, a=a, z=beta, ndt=ndt)
+        data[((df_nrow*(x-1))+cum_nrow+i),] <- c(x, s, d1[i], d2[i],cdur[i],cpos[i],
+                                                 diff_process[1],diff_process[2])
       }
+      cum_nrow <- cum_nrow+nTrials
     }
     end_time <- Sys.time()
     print(end_time - start_time)
+    x <- x+1
   }
   
-  return(data)
+  return(as.data.frame(data))
 }
 
-# pred_sub_m7 <- sub_sim(mat = mat)
-# setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
-# write.csv(pred_sub_m7,"pred_sub_m7.csv")
+pred_sub_m7 <- sub_sim(mat = posteriors)
 
+# setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# write.csv(pred_sub_m7,"pred_sub_m7_exp1.csv")
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+pred_sub_m7_exp1 <- read_csv("pred_sub_m7_exp1.csv")
 
 # summarize within dataset
 summary_pred_sub_m7 <- pred_sub_m7 %>% 
@@ -418,11 +461,11 @@ summary_pred_sub_m7 <- summary_pred_sub_m7 %>%
   group_by(sub,
            cpos,
            cdur) %>%
-  summarise(acc_quantile_low=quantile(acc,probs=0.025),
-            acc_quantile_high=quantile(acc,probs=0.975),
+  summarise(acc_hdi_low=HDInterval::hdi(acc,credMass = 0.89)['lower'],
+            acc_hdi_high=HDInterval::hdi(acc,credMass = 0.89)['upper'],
             acc=mean(acc),
-            rt_quantile_low=quantile(rt,probs=0.025),
-            rt_quantile_high=quantile(rt,probs=0.975),
+            rt_hdi_low=HDInterval::hdi(rt,credMass = 0.89)['lower'],
+            rt_hdi_high=HDInterval::hdi(rt,credMass = 0.89)['upper'],
             rt=median(rt))
 
 summary_pred_sub_m7$cpos <- as.factor(summary_pred_sub_m7$cpos)
@@ -440,7 +483,7 @@ summary$prob_c[summary$cpos==2] <- 1 - summary$prob_c[summary$cpos==2]
 summary$cpos <- as.factor(summary$cpos)
 
 
-tiff('/users/lukas/desktop/pp_check_sub_acc.tiff', units="in", width=16, height=8, res=400)
+tiff('/users/lukas/desktop/pp_check_sub_acc_exp1.tiff', units="in", width=9, height=10, res=400)
 summary_pred_sub_m7 %>% 
   ggplot(aes(x=cdur,
              y=acc,
@@ -448,8 +491,8 @@ summary_pred_sub_m7 %>%
              fill=cpos)) +
   # geom_point(shape=4)+
   # geom_line()+
-  geom_ribbon(aes(ymin = acc_quantile_low,
-                  ymax = acc_quantile_high,
+  geom_ribbon(aes(ymin = acc_hdi_low,
+                  ymax = acc_hdi_high,
                   fill=cpos),
               alpha=0.2,
               color=NA)+
@@ -462,7 +505,7 @@ summary_pred_sub_m7 %>%
                         y=prob_c,
                         color=cpos),
             alpha=0.5)+
-  facet_wrap(~sub,nrow=4)+
+  facet_wrap(~sub,nrow=7)+
   ggthemes::theme_tufte()+
   scale_color_manual(values = color_palette)+
   scale_fill_manual(values = color_palette,
@@ -470,7 +513,8 @@ summary_pred_sub_m7 %>%
   ylab("Probability for c > s response")+
   xlab("\nDuration of c")+
   labs(color = "Position of c")+
-  theme(axis.text.x = element_text(size = 12),
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
         axis.text.y = element_text(size = 12),
         text=element_text(size = 16),
         plot.title = element_text(size =18,
@@ -642,19 +686,20 @@ summary_DL_PSE$weightdiff_percent <- (abs(summary_DL_PSE$individual_b1v) - abs(s
 sumsum <- data_frame(emp=summary_emp_DL_PSE$DL_diff,
                      weight_diff=summary_DL_PSE$weightdiff_percent)
 
-tiff('/users/lukas/desktop/pp_Weights_DL.tiff', units="in", width=6, height=5, res=400)
-sumsum %>%
+p1 <- sumsum %>%
   ggplot(aes(x=emp,
              y=weight_diff))+
-  geom_point()+
+  geom_point(size=2,
+             alpha=0.9)+
   scale_x_continuous(expand = c(0.01,1))+
   # scale_y_continuous(limits = c(-110,110))+
-  geom_smooth(method='lm',se=F,
+  geom_smooth(method='lm',se=T,
               color="black",
+              fill="gray",
               linetype="dashed",
               size=0.5)+
-  geom_text(aes(x=-100,
-                y=-0.8),
+  geom_text(aes(x=-50,
+                y=-1),
             label=paste("r =",as.character(round(cor(sumsum$emp,sumsum$weight_diff),digits=2))),
             family = "serif",
             size=5)+
@@ -669,28 +714,31 @@ sumsum %>%
         plot.title = element_text(size =18,
                                   hjust = 0.5),
         axis.title.y = element_text(vjust = 0.5,
-                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))
-
-dev.off()
-
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))+
+  scale_x_continuous(breaks = c(-250,-200,-150,-100,-50,0),
+                     expand = c(0.01,0.01))+
+  scale_y_continuous(breaks = seq(-1.2,0,0.2),
+                     limits = c(-1.3,0.1))
+p1
 
 # weights difference on PSE
 sumsum <- data_frame(emp=summary_emp_DL_PSE$PSE_dff,
                      weight_diff=summary_DL_PSE$weightdiff_percent)
 
-tiff('/users/lukas/desktop/pp_Weights_TOE.tiff', units="in", width=6, height=5, res=400)
-sumsum %>%
+p2 <- sumsum %>%
   ggplot(aes(x=emp,
              y=weight_diff))+
-  geom_point()+
+  geom_point(size=2,
+             alpha=0.9)+
   scale_x_continuous(expand = c(0.01,1))+
   # scale_y_continuous(limits = c(-110,110))+
-  geom_smooth(method='lm',se=F,
+  geom_smooth(method='lm',se=T,
               color="black",
+              fill="gray",
               linetype="dashed",
               size=0.5)+
-  geom_text(aes(x=-50,
-                y=-0.8),
+  geom_text(aes(x=0,
+                y=-1),
             label=paste("r =",as.character(round(cor(sumsum$emp,sumsum$weight_diff),digits=2))),
             family = "serif",
             size=5)+
@@ -705,8 +753,19 @@ sumsum %>%
         plot.title = element_text(size =18,
                                   hjust = 0.5),
         axis.title.y = element_text(vjust = 0.5,
-                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))+
+  scale_x_continuous(expand = c(0.01,0.01))+
+  scale_y_continuous(breaks = seq(-1.2,0,0.2),
+                     limits = c(-1.3,0.1))
 
+p2
+
+
+tiff('/users/lukas/desktop/pp_check_DL.tiff', units="in", width=9, height=5, res=400)
+plot_grid(p1,p2,
+          labels = "AUTO",
+          label_fontfamily= "serif",
+          label_size = 18)
 dev.off()
 
 #------------------------------------------------------------------------#
@@ -721,8 +780,8 @@ tiff('/users/lukas/desktop/pp_check_rt.tiff', units="in", width=8, height=5, res
 summary_pred_m7 %>% ggplot(aes(x=cdur,
                                y = rt,
                                color=cpos))+
-  geom_ribbon(aes(ymin = rt_quantile_low,
-                  ymax = rt_quantile_high,
+  geom_ribbon(aes(ymin = rt_hdi_low,
+                  ymax = rt_hdi_high,
                   fill=cpos),
               alpha=0.2,
               color=NA)+
@@ -829,6 +888,14 @@ df_rt_quantiles %<>%
   mutate(quantile = as_factor(quantile)) %>% 
   mutate(rt=rt/1000)
 
+sumsum <- df %>% 
+  drop_na() %>% 
+  droplevels() %>%
+  group_by(cpos, correct, cdur) %>%
+  summarise(n=length(RT))
+  
+
+
 
 # have to flip the responses because of unclear reason
 pred_m7_rt_quantiles <- pred_m7 %>% 
@@ -866,8 +933,8 @@ pred_m7_rt_quantiles %<>%
            correct,
            quantile) %>% 
   summarise(rt_median=median(rt),
-            quantile_low=quantile(rt,probs=0.025),
-            quantile_high=quantile(rt,probs=0.975))
+            quantile_low=HDInterval::hdi(rt,credMass=0.89)["lower"],
+            quantile_high=HDInterval::hdi(rt,credMass=0.89)["upper"])
 
 
 pred_m7_rt_quantiles %>%
@@ -913,4 +980,96 @@ pred_m7_rt_quantiles %>%
         axis.title.y = element_text(vjust = 0.5,
                                     margin = margin(t = 0, r = 20, b = 0, l = 0)))
 
+
+##------------##
+## Second Attempt
+##------------##
+df_rt_quantiles <- df %>% 
+  rename(rt=RT) %>% 
+  droplevels() %>%
+  group_by(cpos, cdur) %>%
+  nest() %>%
+  mutate(data = purrr::map(data, qfun)) %>%
+  unnest() %>% 
+  mutate(quantile = as_factor(quantile)) %>% 
+  mutate(rt=rt/1000) %>% 
+  rename(`Position of c`=cpos)
+
+sumsum_pred_m7 <- pred_m7 %>% 
+  mutate(resp=ifelse(resp==1,0,1)) %>% 
+  droplevels() %>%
+  group_by(dataset, cpos, cdur) %>%
+  nest() %>%
+  mutate(data = purrr::map(data, qfun)) %>%
+  unnest() %>% 
+  mutate(quantile = as_factor(quantile)) %>% 
+  ungroup() %>% 
+  group_by(cpos,
+           cdur,
+           quantile) %>% 
+  summarise(rt_median=median(rt),
+            quantile_low=HDInterval::hdi(rt,credMass=0.89)["lower"],
+            quantile_high=HDInterval::hdi(rt,credMass=0.89)["upper"]) %>% 
+  rename(`Position of c`=cpos)
+
+tiff('/users/lukas/desktop/pp_check_rt.tiff', units="in", width=9, height=5, res=400)
+sumsum_pred_m7 %>%
+  ggplot(aes(x = as_factor(cdur), y = rt_median,
+             group = quantile,
+             color = quantile)) +
+  # geom_line(alpha = 1, size = 1) +
+  # geom_point(alpha = 1, size = 4, shape=1) +
+  geom_ribbon(aes(ymin = quantile_low,
+                  ymax = quantile_high,
+                  group = quantile,
+                  fill = quantile),
+              alpha=0.2,
+              color=NA)+
+  geom_point(data = df_rt_quantiles,
+             mapping = aes(x = as_factor(cdur),
+                           y = rt,
+                           group = quantile,
+                           color = quantile))+
+  geom_line(data = df_rt_quantiles,
+            mapping = aes(x = as_factor(cdur),
+                          y = rt,
+                          group = quantile,
+                          color = quantile))+
+  facet_grid(~`Position of c`,
+             labeller = label_both) +
+  scale_color_viridis(direction=-1,discrete = TRUE, option = "E") +
+  scale_fill_viridis(direction=-1,discrete = TRUE, option = "E",guide=F) +
+  ggtitle("") +
+  ggthemes::theme_tufte()+
+  ylab("Response time (s)")+
+  xlab("\nDuration of c (ms)")+
+  labs(color = "Quantile")+
+  theme(axis.line = element_line(size = .5, color = "#969696"),
+        axis.ticks = element_line(color = "#969696"),
+        axis.text.x = element_text(size = 14,
+                                   angle = 45, vjust = 0.5, hjust=1),
+        axis.text.y = element_text(size = 14),
+        text=element_text(size = 16),
+        plot.title = element_text(size =18,
+                                  hjust = 0.5),
+        axis.title.y = element_text(vjust = 0.5,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0))
+        )
+  
+dev.off()
+
+
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/code")
+model_H <- readRDS("fit_condA_newH_m9.RDS")
+check_divergences(model_H)
+traceplot(model_H)
+
+pars <- c("mu_a","mu_ndt","mu_z0","mu_bz","mu_v0","mu_b1v","mu_b2v","mu_g")
+mcmc_pairs(model_H,
+           pars=pars)
+
+shinystan::launch_shinystan(model_H)
+
+
+individual_ndt <- summary(m7,pars=c("ndt[1]","ndt[2]","ndt[3]","ndt[4]","ndt[5]","ndt[6]","ndt[7]","ndt[8]","ndt[9]","ndt[10]","ndt[11]","ndt[12]","ndt[13]","ndt[14]","ndt[15]","ndt[16]","ndt[17]","ndt[18]","ndt[19]","ndt[20]","ndt[21]"))$summary[,"mean"]
 

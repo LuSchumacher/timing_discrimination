@@ -28,9 +28,6 @@ parameters {
   real                           mu_b2v;     // mean drift beta 2
   real<lower=0>                  sigma_b2v;  // mean drift beta 2
   
-  real<lower=0, upper=1>         mu_g;       // mean g parameter
-  real<lower=0>                  sigma_g;    // mean g parameter
-  
   //individual parameter  
   real<lower=0>                  a[S];       // individual threshold
   real<lower=0>                  ndt[S];     // individual non-decision time
@@ -39,33 +36,29 @@ parameters {
   real                           v0[S];      // individual drift intercept
   real                           b1v[S];     // individual drift beta 1
   real                           b2v[S];     // individual drift beta 2
-  real<lower=0, upper=1>         g[S];       // individual g 
+  
+  //trial-by-trial variability
+  // hyper
+  real<lower=0>                  mu_ndt_sd;  // mean non-decision time variability
+  real<lower=0>                  sd_ndt_sd;  // sd non-decision time variability
+  // individual
+  real<lower=0>                  ndt_sd[S]; // trial-by-trial ndt
+  real<lower=0>                  ndt_var[T]; // trial-by-trial ndt
+
 }
 
 transformed parameters {
   vector[T] delta;
   vector[T] beta;
-  vector[T] I;
-  
-  // Internal representation updating
-  I[1] = d1[1];
-
-  for (i in 2:T) {
-    if (sub[i] != sub[i-1]) {
-      I[i] = d1[i];
-    } else {
-      I[i] = g[sub[i]]*I[i-1] + (1-g[sub[i]])*d1[i];
-    }
-  }
   
   // Compute  trial-by-trial delta
   for (i in 1:T){
-    delta[i] = v0[sub[i]] + b1v[sub[i]] * I[i] + b2v[sub[i]] * d2[i];
+    delta[i] = v0[sub[i]] + b1v[sub[i]] * d1[i] + b2v[sub[i]] * d2[i];
   }
   
   // Compute trial-by-trial beta
   for (i in 1:T){
-    beta[i] = z0[sub[i]] + bz[sub[i]] * I[i];
+    beta[i] = z0[sub[i]] + bz[sub[i]] * d1[i];
   }
 }
 
@@ -87,9 +80,9 @@ model {
   sigma_b1v ~ gamma(1, 5);
   mu_b2v    ~ normal(0, 1);
   sigma_b2v ~ gamma(1, 5);
-
-  mu_g      ~ beta(1, 1);
-  sigma_g   ~ gamma(1, 5);
+  
+  mu_ndt_sd ~ gamma(1, 5);
+  sd_ndt_sd ~ gamma(1, 5);
 
   // individual priors
   for (i in 1:S) {
@@ -100,14 +93,15 @@ model {
     v0[i]    ~ normal(mu_v0, sigma_v0);
     b1v[i]   ~ normal(mu_b1v, sigma_b1v);
     b2v[i]   ~ normal(mu_b2v, sigma_b2v);
-    g[i]     ~ normal(mu_g, sigma_g)T[0,1];
+    ndt_sd[i]~ normal(mu_ndt_sd,sd_ndt_sd)T[0,];
   }
 
   for (i in 1:T) {
     if (resp[i] == 1) {
-      rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], beta[i], delta[i]);
+      ndt_var[i] ~ uniform(ndt[sub[i]]-ndt_sd[sub[i]]/2, ndt[sub[i]]+ndt_sd[sub[i]]/2);
+      rt[i] ~ wiener(a[sub[i]], ndt_var[i], beta[i], delta[i]);
     } else {
-        rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], 1-beta[i], -delta[i]);
+        rt[i] ~ wiener(a[sub[i]], ndt_var[i], 1-beta[i], -delta[i]);
     }
   }
   
@@ -117,9 +111,9 @@ generated quantities {
   vector[T] log_lik;
   for (i in 1:T) {
     if(resp[i]==1) {
-      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], beta[i], delta[i]);
+      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt_var[i], beta[i], delta[i]);
     } else {
-      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], 1-beta[i], -delta[i]);
+      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt_var[i], 1-beta[i], -delta[i]);
     }
   }
 }

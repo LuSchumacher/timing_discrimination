@@ -97,8 +97,8 @@ model {
   }
 
   for (i in 1:T) {
+    ndt_var[i] ~ uniform(ndt[sub[i]]-ndt_sd[sub[i]]/2, ndt[sub[i]]+ndt_sd[sub[i]]/2);
     if (resp[i] == 1) {
-      ndt_var[i] ~ uniform(ndt[sub[i]]-ndt_sd[sub[i]]/2, ndt[sub[i]]+ndt_sd[sub[i]]/2);
       rt[i] ~ wiener(a[sub[i]], ndt_var[i], beta[i], delta[i]);
     } else {
         rt[i] ~ wiener(a[sub[i]], ndt_var[i], 1-beta[i], -delta[i]);

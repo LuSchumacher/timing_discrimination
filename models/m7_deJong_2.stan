@@ -36,15 +36,6 @@ parameters {
   real                           v0[S];      // individual drift intercept
   real                           b1v[S];     // individual drift beta 1
   real                           b2v[S];     // individual drift beta 2
-  
-  //trial-by-trial variability
-  // hyper
-  real<lower=0>                  mu_ndt_sd;  // mean non-decision time variability
-  real<lower=0>                  sd_ndt_sd;  // sd non-decision time variability
-  // individual
-  real<lower=0>                  ndt_sd[S]; // trial-by-trial ndt
-  real<lower=0>                  ndt_var[T]; // trial-by-trial ndt
-
 }
 
 transformed parameters {
@@ -53,7 +44,7 @@ transformed parameters {
   
   // Compute  trial-by-trial delta
   for (i in 1:T){
-    delta[i] = v0[sub[i]] + b1v[sub[i]] * d1[i] + b2v[sub[i]] * d2[i];
+    delta[i] = v0[sub[i]] + ((1-b1v[sub[i]])*d1[i] + (1-b2v[sub[i]])*d2[i]) * ((1/b1v[sub[i]] + 1/b2v[sub[i]])/2);
   }
   
   // Compute trial-by-trial beta
@@ -71,18 +62,15 @@ model {
 
   mu_z0     ~ beta(5, 5);
   sigma_z0  ~ gamma(1, 5);
-  mu_bz     ~ normal(0, 1);
+  mu_bz     ~ normal(0, 2);
   sigma_bz  ~ gamma(1, 5);
 
   mu_v0     ~ normal(0, 5);
   sigma_v0  ~ gamma(1, 5);
-  mu_b1v    ~ normal(0, 1);
+  mu_b1v    ~ normal(0, 5);
   sigma_b1v ~ gamma(1, 5);
-  mu_b2v    ~ normal(0, 1);
+  mu_b2v    ~ normal(0, 5);
   sigma_b2v ~ gamma(1, 5);
-  
-  mu_ndt_sd ~ gamma(1, 2);
-  sd_ndt_sd ~ gamma(1, 5);
 
   // individual priors
   for (i in 1:S) {
@@ -93,15 +81,13 @@ model {
     v0[i]    ~ normal(mu_v0, sigma_v0);
     b1v[i]   ~ normal(mu_b1v, sigma_b1v);
     b2v[i]   ~ normal(mu_b2v, sigma_b2v);
-    ndt_sd[i]~ normal(mu_ndt_sd,sd_ndt_sd)T[0,];
   }
 
   for (i in 1:T) {
-    ndt_var[i] ~ uniform(ndt[sub[i]]-ndt_sd[sub[i]]/2, ndt[sub[i]]+ndt_sd[sub[i]]/2);
     if (resp[i] == 1) {
-      rt[i] ~ wiener(a[sub[i]], ndt_var[i], beta[i], delta[i]);
+      rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], beta[i], delta[i]);
     } else {
-        rt[i] ~ wiener(a[sub[i]], ndt_var[i], 1-beta[i], -delta[i]);
+        rt[i] ~ wiener(a[sub[i]], ndt[sub[i]], 1-beta[i], -delta[i]);
     }
   }
   
@@ -111,9 +97,9 @@ generated quantities {
   vector[T] log_lik;
   for (i in 1:T) {
     if(resp[i]==1) {
-      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt_var[i], beta[i], delta[i]);
+      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], beta[i], delta[i]);
     } else {
-      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt_var[i], 1-beta[i], -delta[i]);
+      log_lik[i] = wiener_lpdf(rt[i] | a[sub[i]], ndt[sub[i]], 1-beta[i], -delta[i]);
     }
   }
 }

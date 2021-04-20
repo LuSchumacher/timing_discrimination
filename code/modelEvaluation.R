@@ -12,6 +12,7 @@ library(bridgesampling)
 library(HDInterval)
 library(cowplot)
 library(bayestestR)
+library(tidybayes)
 color_palette <- c("#2E5868","#B06988")
 
 # read empirical data
@@ -762,7 +763,7 @@ p2
 
 
 tiff('/users/lukas/desktop/pp_check_DL.tiff', units="in", width=9, height=5, res=400)
-plot_grid(p1,p2,
+plot_grid(p2,p1,
           labels = "AUTO",
           label_fontfamily= "serif",
           label_size = 18)

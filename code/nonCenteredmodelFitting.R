@@ -11,6 +11,7 @@ df <- read_csv("exp1_cond_C.csv")
 ##------------------------------------------------
 ## FITTING PREPARATION
 ##------------------------------------------------
+df %<>% filter(sub<10) 
 
 # number of participants
 S = length(unique(df$sub))
@@ -35,33 +36,24 @@ init = function(chains=4) {
     L[[c]]$mu_a   = 0.5
     L[[c]]$mu_ndt = -2.5
     L[[c]]$mu_z0  = rnorm(1,0,1)
-    L[[c]]$mu_bz  = 0.0
     L[[c]]$mu_v0  = rnorm(1,0,1)
-    L[[c]]$mu_bv  = rnorm(1,0,1)
     L[[c]]$mu_b1v = rnorm(1,0,1)
     L[[c]]$mu_b2v = rnorm(1,0,1)
-    L[[c]]$mu_g   = rnorm(1,0,1)
     
     L[[c]]$sd_a   = 0.001
     L[[c]]$sd_ndt = 0.001
     L[[c]]$sd_z0  = 0.001
-    L[[c]]$sd_bz  = 0.001
     L[[c]]$sd_v0  = 0.001
-    L[[c]]$sd_bv  = 0.001
     L[[c]]$sd_b1v = 0.001
     L[[c]]$sd_b2v = 0.001
-    L[[c]]$sd_g   = 0.001
     
     S = length(unique(df$sub))
-    L[[c]]$z_a   = rnorm(S,0,1)
+    L[[c]]$z_a   = abs(rnorm(S,0,1))
     L[[c]]$z_ndt = rnorm(S,0,1)
     L[[c]]$z_z0  = rnorm(S,0,1)
-    L[[c]]$z_bz  = rep(0.0,S)
     L[[c]]$z_v0  = rnorm(S,0,1)
-    L[[c]]$z_bv  = rnorm(S,0,1)
     L[[c]]$z_b1v = rnorm(S,0,1)
     L[[c]]$z_b2v = rnorm(S,0,1)
-    L[[c]]$z_g   = rnorm(S,0,1)
   }
   return (L)
 }
@@ -69,14 +61,14 @@ init = function(chains=4) {
 ##------------------------------------------------
 ## FIT MODEL
 ##------------------------------------------------
-setwd("/users/lukas/documents/github/timing_discrimination/models")
-nonC_fit_cond_C_m9 <-  stan("new_hierarchical_m9.stan",
-                        init=init(4),
-                        data=stan_data,
-                        chains=4,
-                        iter = 2000,
-                        cores=parallel::detectCores(),
-                        control = list(adapt_delta=0.95))
+setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/code")
+nonC_fit_m7 <-  stan("simpleSWM_DDM_nonCentered.stan",
+                     init=init(4),
+                     data=stan_data,
+                     chains=4,
+                     iter = 500,
+                     cores=parallel::detectCores(),
+                     control = list(adapt_delta=0.95))
 
-loo_fit_cond_C_m9 <- loo(fit_cond_C_m9)
-saveRDS(fit_cond_C_m9,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_cond_C_m9.rds")
+# loo_fit_cond_C_m9 <- loo(fit_cond_C_m9)
+# saveRDS(fit_cond_C_m9,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_cond_C_m9.rds")

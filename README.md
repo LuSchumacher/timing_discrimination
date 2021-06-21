@@ -1,2 +1,2 @@
 # Interval Timing Discrimination
-Code and Data for Modeling Interval Timing Discrimination
+Contains the code for our paper: "Duration Discrimination: A Diffusion Decision Modeling Approach"

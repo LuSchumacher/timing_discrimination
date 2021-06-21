@@ -2,7 +2,7 @@ data {
   int<lower=1>                   T;         // number of trials 
   int<lower=1>                   S;         // number of subjects
   int<lower=1>                   sub[T];    // subject number
-  int                            resp[T];   // response
+  int<lower=1, upper=2>          resp[T];   // response
   vector<lower=0>[T]             rt;        // response time
   vector[T]                      d1;        // stimulus 1
   vector[T]                      d2;        // stimulus 2
@@ -23,6 +23,8 @@ parameters {
   real<lower=0>                  sigma_v0;   // SD drift intercept
   real                           mu_b1v;     // mean drift beta 1
   real<lower=0>                  sigma_b1v;  // mean drift beta 1
+  real                           mu_b2v;     // mean drift beta 2
+  real<lower=0>                  sigma_b2v;  // mean drift beta 2
   
   real<lower=0, upper=1>         mu_g;       // mean g parameter
   real<lower=0>                  sigma_g;    // mean g parameter
@@ -33,36 +35,28 @@ parameters {
   real<lower=0, upper=1>         z0[S];      // individual starting point intercept
   real                           v0[S];      // individual drift intercept
   real                           b1v[S];     // individual drift beta 1
+  real                           b2v[S];     // individual drift beta 2
   real<lower=0, upper=1>         g[S];       // individual g 
 }
 
 transformed parameters {
   vector[T] delta;
-  vector[T] X_1;
-  vector[T] X_2;
-  real      I;
+  vector[T] I;
   
   // Internal representation updating
-  I = d1[1];
-  X_1[1] = d1[1];
-  X_2[1] = d2[1];
+  I[1] = d1[1];
 
   for (i in 2:T) {
     if (sub[i] != sub[i-1]) {
-      I = d1[i];
-      X_1[i] = d1[i];
-      X_2[i] = d2[i];
+      I[i] = d1[i];
     } else {
-      I = g[sub[i]]*I + (1-g[sub[i]])*d1[i];
-      X_1[i] = I;
-      I = g[sub[i]]*I + (1-g[sub[i]])*d2[i];
-      X_2[i] = I;
+      I[i] = g[sub[i]]*I[i-1] + (1-g[sub[i]])*d1[i];
     }
   }
   
   // Compute  trial-by-trial delta
   for (i in 1:T){
-    delta[i] = v0[sub[i]] + b1v[sub[i]] * ((X_1[i] - X_2[i]));
+    delta[i] = v0[sub[i]] + b1v[sub[i]] * I[i] + b2v[sub[i]] * d2[i];
   }
 
 }
@@ -79,10 +73,12 @@ model {
 
   mu_v0     ~ normal(0, 5);
   sigma_v0  ~ gamma(1, 5);
-  mu_b1v    ~ normal(0, 5);
+  mu_b1v    ~ normal(0, 1);
   sigma_b1v ~ gamma(1, 5);
-  
-  mu_g      ~ normal(0, 0.5);
+  mu_b2v    ~ normal(0, 1);
+  sigma_b2v ~ gamma(1, 5);
+
+  mu_g      ~ beta(1, 1);
   sigma_g   ~ gamma(1, 5);
 
   // individual priors
@@ -92,7 +88,8 @@ model {
     z0[i]    ~ normal(mu_z0, sigma_z0);
     v0[i]    ~ normal(mu_v0, sigma_v0);
     b1v[i]   ~ normal(mu_b1v, sigma_b1v);
-    g[i]     ~ normal(mu_g, sigma_g)T[-1,1];
+    b2v[i]   ~ normal(mu_b2v, sigma_b2v);
+    g[i]     ~ normal(mu_g, sigma_g)T[0,1];
   }
 
   for (i in 1:T) {
@@ -115,3 +112,4 @@ generated quantities {
     }
   }
 }
+

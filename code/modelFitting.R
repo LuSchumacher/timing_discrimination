@@ -67,7 +67,6 @@ init = function(chains=4) {
     L[[c]]$b2v = rep(0.0,S)
     L[[c]]$g   = rnorm(S,0.5,0.1)
     L[[c]]$w   = rnorm(S,0.5,0.1)
-    # L[[c]]$ndt_sd   = rep(0.001,S)
   }
   return (L)
 }
@@ -76,21 +75,12 @@ init = function(chains=4) {
 ## FIT MODEL
 ##------------------------------------------------
 setwd("/users/lukas/documents/github/timing_discrimination/models")
-fit_tbtVarm7 <-  stan("trial-by-trial_var_m7.stan",
-                         init=init(4),
-                         data=stan_data,
-                         chains=4,
-                         iter = 500,
-                         cores=parallel::detectCores(),
-                         control = list(adapt_delta=0.95))
+fit_m7 <-  stan("model_7.stan",
+                init=init(4),
+                data=stan_data,
+                chains=4,
+                iter = 500,
+                cores=parallel::detectCores(),
+                control = list(adapt_delta=0.95))
 
 # saveRDS(fit_m11,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_m11_new.rds")
-
-
-fit_tbtVarm7
-# ndt_sd_mu
-params <- c("mu_a","mu_ndt", "mu_z0","mu_bz","mu_v0","mu_b1v","mu_b2v","ndt_sd_mu")
-mcmc_pairs(fit_tbtVarm7,pars=params)
-
-
-

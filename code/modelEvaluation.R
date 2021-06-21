@@ -13,6 +13,7 @@ library(HDInterval)
 library(cowplot)
 library(bayestestR)
 library(tidybayes)
+library(rcartocolor)
 color_palette <- c("#2E5868","#B06988")
 
 # read empirical data
@@ -41,33 +42,27 @@ loo_m1 <- loo(m1)
 # IRM
 m2 <- readRDS("fit_m2_new.rds")
 loo_m2 <- loo(m2)
-
-setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 # SWM
 m3 <- readRDS("fit_m6_new.rds")
 loo_m3 <- loo(m3)
 # IRM 2x IR
 m4 <- readRDS("fit_m4_exp1.rds")
 loo_m4 <- loo(m4)
-setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 # IRM + SWM
 m5 <- readRDS("fit_m5_new.rds")
 loo_m5 <- loo(m5)
 # IRM + bias
 m6 <- readRDS("fit_m4_new.rds")
 loo_m6 <- loo(m6)
-setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 # SWM + bias
 m7 <- readRDS("fit_m7_new.rds")
 loo_m7 <- loo(m7)
-setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 # IRM 2xIR
 m8 <- readRDS("fit_m9_exp1_actual.rds")
 loo_m8 <- loo(m8)
 # IRM + SWM + bias
 m9 <- readRDS("fit_m9_new.rds")
 loo_m9 <- loo(m9)
-
 
 # compare goodness-of-fit
 comparison <- loo_compare(loo_m1,
@@ -79,7 +74,6 @@ comparison <- loo_compare(loo_m1,
                           loo_m7,
                           loo_m8)
 
-
 ## plot model comparison
 #------------------------------------------------------------------------#
 # df with cols: model, elpd_diff, SE
@@ -88,10 +82,10 @@ comparison %<>%
   mutate(model=str_replace_all(model,"(.{5})", "\\1 "),
          Experiment=1)
 
-write.csv(comparison,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/loo_comparison_exp1.csv")
-
-# read comparison
-comparison <- read_csv("/users/lukas/documents/UniHeidel/Project_Discrimination/fits/loo_comparison.csv")
+# write.csv(comparison,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/loo_comparison_exp1.csv")
+# 
+# # read comparison
+# comparison <- read_csv("/users/lukas/documents/UniHeidel/Project_Discrimination/fits/loo_comparison_exp1.csv")
 
 comparison %>% 
   ggplot(aes(x = elpd_diff,
@@ -122,58 +116,12 @@ comparison %>%
         axis.title.y = element_text(vjust = 0.5,
                                     margin = margin(t = 0, r = 20, b = 0, l = 0)))
 
-
-#------------------------------------------------------------------------#
-# POSTERIOR PREDICTIVE CHECK: BRIDGE SAMPLING
-#------------------------------------------------------------------------#
-
-setwd("/users/lukas/documents/github/timing_discrimination/models")
-new_mod <- stan("hierarchical_m7.stan",
-                data=stan_data, chains = 0)
-m7_bridge <- bridgesampling::bridge_sampler(m7, new_mod,
-                                            method="warp3",
-                                            maxiter = 2000,
-                                            cores=parallel::detectCores())
-
-new_mod <- stan("hierarchical_m9.stan",
-                data=stan_data, chains = 0)
-m9_bridge <- bridgesampling::bridge_sampler(m9, new_mod,
-                                            method="warp3",
-                                            maxiter = 2000,
-                                            cores=parallel::detectCores())
-
-bf <- bridgesampling::bf(m9_bridge,m7_bridge)
-
-print(m9_bridge)
-post_prob <- post_prob(m9_bridge,m7_bridge)
-
-
-setwd("/users/lukas/documents/github/timing_discrimination/models")
-new_mod <- stan("hierarchical_m2.stan",
-                data=stan_data, chains = 0)
-m2_bridge <- bridgesampling::bridge_sampler(m2, new_mod,
-                                            method="warp3",
-                                            maxiter = 2000,
-                                            cores=parallel::detectCores())
-
-new_mod <- stan("hierarchical_m6.stan",
-                data=stan_data, chains = 0)
-m6_bridge <- bridgesampling::bridge_sampler(m6, new_mod,
-                                            method="warp3",
-                                            maxiter = 2000,
-                                            cores=parallel::detectCores())
-
-post_prob <- post_prob(m2_bridge,m6_bridge)
-bf <- bf(m6_bridge,m2_bridge)
-
-
 #------------------------------------------------------------------------#
 # POSTERIOR PREDICTIVE CHECK: ACCURACY
 #------------------------------------------------------------------------#
 setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 m7 <- readRDS("fit_m7_new.rds")
 pars <- c("mu_a","mu_ndt","mu_z0","mu_bz","mu_v0","mu_b1v","mu_b2v")
-# mcmc_pairs(m7,pars = pars)
 
 # extract posterior samples
 mat <- as.data.frame(rstan::extract(m7, pars=pars))
@@ -191,7 +139,6 @@ d1 = df$d1-500
 d2 = df$d2-500
 cdur <- df$cdur
 cpos <- as.numeric(df$cpos)
-
 
 # simulate new data
 discrimination_ddm_sim <- function(nTrials, mat){
@@ -228,12 +175,13 @@ discrimination_ddm_sim <- function(nTrials, mat){
   return(data)
 }
 
-# pred_m7 <- discrimination_ddm_sim(nTrials,mat)
+pred_m7 <- discrimination_ddm_sim(nTrials,mat)
+
 # setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 # write.csv(pred_m7,"pred_m7.csv")
-
-setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
-pred_m7 <- read_csv("pred_m7.csv")
+# 
+# setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# pred_m7 <- read_csv("pred_m7.csv")
 
 # summarize within dataset
 summary_pred_m7 <- pred_m7 %>% 
@@ -261,7 +209,6 @@ summary_pred_m7 <- summary_pred_m7 %>%
             rt_hdi_high=HDInterval::hdi(rt,credMass = 0.89)['upper'],
             rt=median(rt))
 
-
 summary_pred_m7$cpos <- as.factor(summary_pred_m7$cpos)
 
 # plot posterior predictive check
@@ -274,8 +221,6 @@ summary_pred_m7 %>% ggplot(aes(x=cdur,
                   fill=cpos),
               alpha=0.2,
               color=NA)+
-  # geom_line(size=0.8)+
-  # geom_point(size=1)
   geom_point(data=df_summary,
              mapping=aes(x=cdur,
                          y=Acc,
@@ -378,9 +323,7 @@ posterior_samples <- sample(max(mat$sample),n_samples)
 posteriors <- mat %>% 
   filter(sample %in% posterior_samples)
 
-
 sub_sim <- function(mat){
-  
   setwd("/Users/lukas/documents/UniHeidel/code")
   source("wienerProcess2.R")
   library(svMisc)
@@ -442,8 +385,8 @@ pred_sub_m7 <- sub_sim(mat = posteriors)
 
 # setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
 # write.csv(pred_sub_m7,"pred_sub_m7_exp1.csv")
-setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
-pred_sub_m7_exp1 <- read_csv("pred_sub_m7_exp1.csv")
+# setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/fits")
+# pred_sub_m7_exp1 <- read_csv("pred_sub_m7_exp1.csv")
 
 # summarize within dataset
 summary_pred_sub_m7 <- pred_sub_m7 %>% 
@@ -483,15 +426,12 @@ summary <- df %>%
 summary$prob_c[summary$cpos==2] <- 1 - summary$prob_c[summary$cpos==2]
 summary$cpos <- as.factor(summary$cpos)
 
-
 tiff('/users/lukas/desktop/pp_check_sub_acc_exp1.tiff', units="in", width=9, height=10, res=400)
 summary_pred_sub_m7 %>% 
   ggplot(aes(x=cdur,
              y=acc,
              color=cpos,
              fill=cpos)) +
-  # geom_point(shape=4)+
-  # geom_line()+
   geom_ribbon(aes(ymin = acc_hdi_low,
                   ymax = acc_hdi_high,
                   fill=cpos),
@@ -524,8 +464,6 @@ summary_pred_sub_m7 %>%
                                     margin = margin(t = 0, r = 20, b = 0, l = 0)))
 
 dev.off()
-
-
 #------------------------------------------------------------------------#
 # POSTERIOR PREDICTIVE CHECK: DIFFERENCE LIMEN
 #------------------------------------------------------------------------#
@@ -534,7 +472,6 @@ prob2logit <- function(prob){
   logit <- log(prob/(1-prob))
   return(logit)
 }
-
 
 pred_sub_m7$DL_1 <- NA
 pred_sub_m7$DL_2 <- NA
@@ -592,7 +529,6 @@ summary_emp_DL_PSE <- df %>%
 
 
 # Type B error
-
 sumsum <- data_frame(emp=summary_emp_DL_PSE$DL_diff,
                      pred=summary_DL_PSE$TypeB)
 
@@ -627,9 +563,7 @@ sumsum %>%
 
 dev.off()
 
-
 # Type A error
-
 sumsum <- data_frame(emp=summary_emp_DL_PSE$PSE_dff,
                      pred=summary_DL_PSE$TOE)
 
@@ -663,25 +597,20 @@ sumsum %>%
                                   hjust = 0.5),
         axis.title.y = element_text(vjust = 0.5,
                                     margin = margin(t = 0, r = 20, b = 0, l = 0)))
-
 dev.off()
-
 #------------------------------------------------------------------------#
 # POSTERIOR PREDICTIVE CHECK: WEIGHT DIFFERENCE
 #------------------------------------------------------------------------#
 # get individual point estimates of b1v and b2v parameter
 individual_b1v <- summary(m7,pars=c("b1v[1]","b1v[2]","b1v[3]","b1v[4]","b1v[5]","b1v[6]","b1v[7]","b1v[8]","b1v[9]","b1v[10]","b1v[11]","b1v[12]","b1v[13]","b1v[14]","b1v[15]","b1v[16]","b1v[17]","b1v[18]","b1v[19]","b1v[20]","b1v[21]"))$summary[,"mean"]
 individual_b2v <- summary(m7,pars=c("b2v[1]","b2v[2]","b2v[3]","b2v[4]","b2v[5]","b2v[6]","b2v[7]","b2v[8]","b2v[9]","b2v[10]","b2v[11]","b2v[12]","b2v[13]","b2v[14]","b2v[15]","b2v[16]","b2v[17]","b2v[18]","b2v[19]","b2v[20]","b2v[21]"))$summary[,"mean"]
-# individual_z0 <- summary(m7,pars=c("z0[1]","z0[2]","z0[3]","z0[4]","z0[5]","z0[6]","z0[7]","z0[8]","z0[9]","z0[10]","z0[11]","z0[12]","z0[13]","z0[14]","z0[15]","z0[16]","z0[17]","z0[18]","z0[19]","z0[20]","z0[21]"))$summary[,"mean"]
 
 summary_DL_PSE$individual_b1v <- individual_b1v
 summary_DL_PSE$individual_b2v <- individual_b2v
-# summary_DL_PSE$individual_z0 <- individual_z0
 
 # summary_DL_PSE$weightdiff <- abs(summary_DL_PSE$individual_b1v) - abs(summary_DL_PSE$individual_b2v)
 
 summary_DL_PSE$weightdiff_percent <- (abs(summary_DL_PSE$individual_b1v) - abs(summary_DL_PSE$individual_b2v))/(abs(summary_DL_PSE$individual_b1v) + abs(summary_DL_PSE$individual_b2v))
-
 
 # weights difference on DL
 sumsum <- data_frame(emp=summary_emp_DL_PSE$DL_diff,
@@ -761,14 +690,12 @@ p2 <- sumsum %>%
 
 p2
 
-
 tiff('/users/lukas/desktop/pp_check_DL.tiff', units="in", width=9, height=5, res=400)
 plot_grid(p2,p1,
           labels = "AUTO",
           label_fontfamily= "serif",
           label_size = 18)
 dev.off()
-
 #------------------------------------------------------------------------#
 # POSTERIOR PREDICTIVE CHECK: RESPONSE TIMES
 #------------------------------------------------------------------------#
@@ -863,12 +790,9 @@ summary_pred_sub_m7 %>%
                                     margin = margin(t = 0, r = 20, b = 0, l = 0)))
 
 dev.off()
-
-
 #------------------------------------------------------------------------#
 # POSTERIOR PREDICTIVE CHECK: RT QUANTILE PLOT
 #------------------------------------------------------------------------#
-
 df_rt_quantiles <- df %>% 
   filter(cdur != 500) %>% 
   rename(rt=RT)
@@ -895,10 +819,7 @@ sumsum <- df %>%
   group_by(cpos, correct, cdur) %>%
   summarise(n=length(RT))
   
-
-
-
-# have to flip the responses because of unclear reason
+# have to flip the responses
 pred_m7_rt_quantiles <- pred_m7 %>% 
   mutate(resp=ifelse(resp==1,0,1))
 
@@ -936,7 +857,6 @@ pred_m7_rt_quantiles %<>%
   summarise(rt_median=median(rt),
             quantile_low=HDInterval::hdi(rt,credMass=0.89)["lower"],
             quantile_high=HDInterval::hdi(rt,credMass=0.89)["upper"])
-
 
 pred_m7_rt_quantiles %>%
   ggplot(aes(x = as_factor(cdur), y = rt_median,
@@ -980,7 +900,6 @@ pred_m7_rt_quantiles %>%
                                   hjust = 0.5),
         axis.title.y = element_text(vjust = 0.5,
                                     margin = margin(t = 0, r = 20, b = 0, l = 0)))
-
 
 ##------------##
 ## Second Attempt
@@ -1054,23 +973,5 @@ sumsum_pred_m7 %>%
         plot.title = element_text(size =18,
                                   hjust = 0.5),
         axis.title.y = element_text(vjust = 0.5,
-                                    margin = margin(t = 0, r = 20, b = 0, l = 0))
-        )
-  
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))
 dev.off()
-
-
-setwd("/users/lukas/documents/UniHeidel/Project_Discrimination/code")
-model_H <- readRDS("fit_condA_newH_m9.RDS")
-check_divergences(model_H)
-traceplot(model_H)
-
-pars <- c("mu_a","mu_ndt","mu_z0","mu_bz","mu_v0","mu_b1v","mu_b2v","mu_g")
-mcmc_pairs(model_H,
-           pars=pars)
-
-shinystan::launch_shinystan(model_H)
-
-
-individual_ndt <- summary(m7,pars=c("ndt[1]","ndt[2]","ndt[3]","ndt[4]","ndt[5]","ndt[6]","ndt[7]","ndt[8]","ndt[9]","ndt[10]","ndt[11]","ndt[12]","ndt[13]","ndt[14]","ndt[15]","ndt[16]","ndt[17]","ndt[18]","ndt[19]","ndt[20]","ndt[21]"))$summary[,"mean"]
-

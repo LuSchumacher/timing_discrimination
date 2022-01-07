@@ -73,7 +73,7 @@ init = function(chains=4) {
 ##------------------------------------------------
 ## FIT MODEL
 ##------------------------------------------------
-fit_m7 <-  stan("models/model_7.stan",
+fit_m6 <-  stan("models/model_6.stan",
                 init=init(4),
                 data=stan_data,
                 chains=4,

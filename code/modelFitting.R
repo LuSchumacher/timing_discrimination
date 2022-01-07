@@ -4,8 +4,7 @@ library(rstan)
 library(magrittr)
 
 # read data
-setwd("/users/lukas/documents/github/timing_discrimination/data")
-df <- read_csv("exp1_cond_C.csv")
+df <- read_csv("data/exp1_cond_C.csv")
 
 ##------------------------------------------------
 ## FITTING PREPARATION
@@ -74,13 +73,10 @@ init = function(chains=4) {
 ##------------------------------------------------
 ## FIT MODEL
 ##------------------------------------------------
-setwd("/users/lukas/documents/github/timing_discrimination/models")
-fit_m7 <-  stan("model_7.stan",
+fit_m7 <-  stan("models/model_7.stan",
                 init=init(4),
                 data=stan_data,
                 chains=4,
                 iter = 500,
                 cores=parallel::detectCores(),
                 control = list(adapt_delta=0.95))
-
-# saveRDS(fit_m11,"/users/lukas/documents/UniHeidel/Project_Discrimination/fits/fit_m11_new.rds")

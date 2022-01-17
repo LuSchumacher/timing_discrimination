@@ -84,10 +84,22 @@ for (i in 1:nrow(emp_data)) {
 
 
 # rt manipulation
-# whenever d2 was longer than d1, then the rt increased by the difference d1 - d2
+# whenever d2 was shorter than d1, then the rt decreased by the difference d1 - d2
 emp_data$rt_new <- NA
 for (i in 1:nrow(emp_data)){
   if (emp_data$d2[i] < emp_data$d1[i]){
+    emp_data$rt_new[i] <- emp_data$rt[i] + ((emp_data$d2[i] - emp_data$d1[i]) / 1000)
+  }
+  else {
+    emp_data$rt_new[i] <- emp_data$rt[i]
+  }
+}
+
+# rt manipulation
+# whenever d2 was longer than d1, then the rt increased by the difference d2 - d1
+emp_data$rt_new <- NA
+for (i in 1:nrow(emp_data)){
+  if (emp_data$d2[i] > emp_data$d1[i]){
     emp_data$rt_new[i] <- emp_data$rt[i] + ((emp_data$d2[i] - emp_data$d1[i]) / 1000)
   }
   else {

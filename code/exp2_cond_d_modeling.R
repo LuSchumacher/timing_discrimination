@@ -88,31 +88,29 @@ for (i in 1:nrow(emp_data)) {
   }
 }
 
-
-
 # rt manipulation
 # whenever d2 was shorter than d1, then the rt decreased by the difference d1 - d2
-emp_data$rt_new <- NA
-for (i in 1:nrow(emp_data)){
-  if (emp_data$d2[i] < emp_data$d1[i]){
-    emp_data$rt_new[i] <- emp_data$rt[i] + ((emp_data$d2[i] - emp_data$d1[i]) / 1000)
-  }
-  else {
-    emp_data$rt_new[i] <- emp_data$rt[i]
-  }
-}
+# emp_data$rt_new <- NA
+# for (i in 1:nrow(emp_data)){
+#   if (emp_data$d2[i] < emp_data$d1[i]){
+#     emp_data$rt_new[i] <- emp_data$rt[i] + ((emp_data$d2[i] - emp_data$d1[i]) / 1000)
+#   }
+#   else {
+#     emp_data$rt_new[i] <- emp_data$rt[i]
+#   }
+# }
 
-# rt manipulation
-# whenever d2 was longer than d1, then the rt increased by the difference d2 - d1
-emp_data$rt_new <- NA
-for (i in 1:nrow(emp_data)){
-  if (emp_data$d2[i] > emp_data$d1[i]){
-    emp_data$rt_new[i] <- emp_data$rt[i] + ((emp_data$d2[i] - emp_data$d1[i]) / 1000)
-  }
-  else {
-    emp_data$rt_new[i] <- emp_data$rt[i]
-  }
-}
+# # rt manipulation
+# # whenever d2 was longer than d1, then the rt increased by the difference d2 - d1
+# emp_data$rt_new <- NA
+# for (i in 1:nrow(emp_data)){
+#   if (emp_data$d2[i] > emp_data$d1[i]){
+#     emp_data$rt_new[i] <- emp_data$rt[i] + ((emp_data$d2[i] - emp_data$d1[i]) / 1000)
+#   }
+#   else {
+#     emp_data$rt_new[i] <- emp_data$rt[i]
+#   }
+# }
 
 # emp_data$rt_new <- NA
 # for (i in 1:nrow(emp_data)){
@@ -140,7 +138,7 @@ hist(accuracy_data/655, breaks=100)
 binom.test(280, 521 , 0.5, alternative = "greater")
 
 # check accuracy of fast guesses
-lower_rt_cutoff <- 0.1
+lower_rt_cutoff <- 0.15
 fast_guesses_summary <- emp_data %>% 
   filter(cdur != 500,
          rt <= lower_rt_cutoff) %>% 
@@ -150,7 +148,7 @@ fast_guesses_summary <- emp_data %>%
             n = length(correct))
 
 # check accuracy of delayed start up's
-upper_rt_cutoff <- 2.5
+upper_rt_cutoff <- 2
 delayed_start_ups_summary <- emp_data %>% 
   filter(cdur != 500,
          rt >= upper_rt_cutoff) %>% 
@@ -182,7 +180,7 @@ for (s in unique(emp_data$sub)) {
   c_before <- c_0
   
   # Compute EWMA for each data point
-  for (i in 1:length(tmp$rt_new)) {
+  for (i in 1:length(tmp$rt)) {
     if(tmp$cdur[i]==500) next
     tmp$c_s[i] <- (lambda*tmp$correct[i]) + ((1-lambda)*c_before)
     tmp$UCL[i] <- c_0 + (L*sigma_0)*sqrt((lambda/(2-lambda))*(1-(1-lambda)^(2*i)))
@@ -224,10 +222,27 @@ data %>%
   # scale_x_continuous(limits = c(0,2.5))+
   facet_wrap(~sub)
 
+data_new <- NULL
+trash <- NULL
+data$inCm[data$inCm == "empty"] <- FALSE
+window <- 5
+for (sub in unique(data$sub)){
+  tmp <- data[data$sub == sub, ]
+  for (i in 1:nrow(tmp)){
+    if (!any(as.logical(tmp$inCm[i:(i + window)]))){
+      data_new <- rbind(data_new, tmp[i:nrow(tmp), ])
+      trash <- rbind(trash, tmp[1:i, ])
+      print(i)
+      break
+    }
+  }
+}
+
+data <- data_new
+
 # summarize emp data
 emp_rt_quantiles <- data %>% 
-  filter(inCm == FALSE,
-         rt_new <= 2.5) %>%
+  filter(rt <= 2.5) %>%
   droplevels() %>%
   group_by(cpos,
            cdur) %>%
@@ -240,7 +255,6 @@ emp_rt_quantiles <- data %>%
 
 # plot rt quantiles
 emp_rt_quantiles %>%
-  # filter(sub <= 6) %>%
   ggplot(aes(x = cdur,
              y = rt,
              group = quantile,
@@ -250,7 +264,6 @@ emp_rt_quantiles %>%
   facet_wrap(~`Position of c`,
              labeller = label_both) +
   scale_y_continuous(breaks = seq(0, 2 , by = 0.2))+
-  # scale_x_continuous(guide = guide_axis(angle = 90))+
   viridis::scale_color_viridis(direction = -1,discrete = TRUE, option = "E") +
   viridis::scale_fill_viridis(direction = -1,discrete = TRUE, option = "E", guide="none") +
   ggtitle("") +
@@ -271,8 +284,7 @@ emp_rt_quantiles %>%
         axis.title.y = element_text(vjust = 0.5,
                                     margin = margin(t = 0, r = 20, b = 0, l = 0)))
 
-
-performance_summary <- data %>% 
+performance_summary <- data_new %>% 
   group_by(sub) %>% 
   summarise(accuracy = mean(correct),
             median_rt = median(rt),
@@ -280,7 +292,7 @@ performance_summary <- data %>%
             n_trials = length(rt))
 
 # check accuracy of fast guesses
-lower_rt_cutoff <- 0.1
+lower_rt_cutoff <- 0.15
 fast_guesses_summary <- data %>% 
   filter(cdur != 500,
          rt <= lower_rt_cutoff) %>% 
@@ -301,10 +313,11 @@ delayed_start_ups_summary <- data %>%
             n = length(correct))
 
 data %<>%
-  filter(rt_new > 0.1)
+  filter(rt >= 0.15,
+         rt <= 2.0)
 
 
-# write_csv(data, "/users/lukas/documents/github/timing_discrimination/data/data_exp2_cond_D_revision_experimental.csv")
+write_csv(data, "/users/lukas/documents/github/timing_discrimination/data/data_exp2_cond_D_revision_lastTry.csv")
 
 
 #---------------------------------------------------------------------------#
